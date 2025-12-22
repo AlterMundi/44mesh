@@ -3,7 +3,7 @@ name: Timestamp on Server
 on:
   push:
     branches:
-      - "feat/netmaker"
+      - "stage"
   workflow_dispatch:
   
 jobs:
