@@ -5,7 +5,6 @@ on:
     branches:
       - "stage"
   workflow_dispatch:
-  
 jobs:
   modify-server:
     # CAMBIO CLAVE: Esto le dice a GitHub que use TU servidor
