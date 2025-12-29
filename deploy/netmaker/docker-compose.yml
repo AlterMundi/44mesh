@@ -17,11 +17,11 @@ services:
       SERVER_HOST: "${SERVER_HOST}"
       SERVER_API_CONN_STRING: "${SERVER_HOST}"
       SERVER_HTTP_HOST: "${SERVER_HOST}"
-      API_PORT: "${NETMAKER_API_PORT:-8443}"
-      BROKER_ENDPOINT: "mqtt://${SERVER_HOST}:${MQTT_PORT:-1883}"
+      API_PORT: "8443"
+      BROKER_ENDPOINT: "mqtt://${SERVER_HOST}:1883"
       MASTER_KEY: "${MASTER_KEY}"
       MQ_HOST: "mq"
-      MQ_PORT: "${MQTT_PORT:-1883}"
+      MQ_PORT: "1883"
       DATABASE: "sqlite"
       NODE_ID: "netmaker-server"
       VERBOSITY: "3"
@@ -29,8 +29,8 @@ services:
       - netmaker_data:/root/data
       - netmaker_certs:/etc/netmaker
     ports:
-      - "${NETMAKER_API_PORT:-8443}:8443"           # API (HTTP, proxied by nginx)
-      - "${WIREGUARD_PORT:-51821}:51821/udp"        # WireGuard
+      - "8443:8443"           # API (HTTP, proxied by nginx)
+      - "51821:51821/udp"      # WireGuard
     depends_on:
       - mq
     restart: unless-stopped
@@ -43,7 +43,20 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mq_data:/mosquitto/data
     ports:
-      - "${MQTT_PORT:-1883}:1883"
+      - "1883:1883"
+    restart: unless-stopped
+
+  # Netmaker UI Dashboard
+  # Replaces netmaker-placeholder-temp container
+  netmaker-ui:
+    image: gravitl/netmaker-ui:v0.24.2
+    container_name: netmaker-ui
+    environment:
+      BACKEND_URL: "https://${SERVER_HOST}"
+    depends_on:
+      - netmaker
+    ports:
+      - "8081:80"
     restart: unless-stopped
 
 volumes:
