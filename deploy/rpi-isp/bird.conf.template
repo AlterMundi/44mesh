@@ -1,0 +1,49 @@
+# BIRD - Mock ISP (AS ${ISP_AS})
+# Announces test prefixes to Border Router
+
+router id ${ISP_IP};
+
+log syslog all;
+
+protocol device {
+    scan time 10;
+}
+
+protocol kernel {
+    ipv4 {
+        import none;
+        export all;
+    };
+}
+
+# Test prefixes to announce (RFC 5737 TEST-NET ranges)
+protocol static isp_routes {
+    ipv4;
+    route ${TEST_PREFIX_1} blackhole;      # TEST-NET-1
+    route ${TEST_PREFIX_2} blackhole;      # TEST-NET-2
+    route ${TEST_PREFIX_3} blackhole;      # TEST-NET-3
+}
+
+# eBGP to Border Router
+protocol bgp border_router {
+    description "Border Router AS ${BORDER_ROUTER_AS}";
+    local ${ISP_IP} as ${ISP_AS};
+    neighbor ${BORDER_ROUTER_IP} as ${BORDER_ROUTER_AS};
+
+    ipv4 {
+        import filter {
+            # Accept mesh network announcements
+            if net ~ [${MESH_ADDRESS_RANGE}] then accept;
+            reject;
+        };
+
+        export filter {
+            # Announce our test prefixes
+            if proto = "isp_routes" then accept;
+            reject;
+        };
+    };
+
+    hold time ${BGP_HOLD_TIME};
+    keepalive time ${BGP_KEEPALIVE_TIME};
+}

@@ -1,0 +1,47 @@
+# BIRD - Border Router (AS ${BORDER_ROUTER_AS})
+# Routes between ISP and Netmaker mesh
+
+router id ${BORDER_ROUTER_IP};
+
+log syslog all;
+
+protocol device {
+    scan time 10;
+}
+
+protocol kernel {
+    ipv4 {
+        import all;
+        export all;
+    };
+}
+
+# Direct routes - learn Netmaker interface
+protocol direct {
+    ipv4;
+    interface "netmaker", "nm-*";  # Netmaker WireGuard interface
+}
+
+# eBGP to ISP
+protocol bgp isp {
+    description "ISP AS ${ISP_AS}";
+    local ${BORDER_ROUTER_IP} as ${BORDER_ROUTER_AS};
+    neighbor ${ISP_IP} as ${ISP_AS};
+
+    ipv4 {
+        import filter {
+            # Accept ISP test prefixes
+            if net ~ [${TEST_PREFIX_1}, ${TEST_PREFIX_2}, ${TEST_PREFIX_3}] then accept;
+            reject;
+        };
+
+        export filter {
+            # Announce our mesh network
+            if net ~ [${MESH_ADDRESS_RANGE}] then accept;
+            reject;
+        };
+    };
+
+    hold time ${BGP_HOLD_TIME};
+    keepalive time ${BGP_KEEPALIVE_TIME};
+}

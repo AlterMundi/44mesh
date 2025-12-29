@@ -1,0 +1,40 @@
+# Go
+*.o
+/bgp-daemon
+/daemon-go/bgp-daemon
+/daemon-go/bin/
+/vendor/
+
+# Environment
+.env
+deploy/*/.env
+!*.env.example
+
+# Docker
+/build/
+*.log
+/tmp/
+
+# etcd data
+/etcd/data/
+
+# TINC keys (generated)
+/configs/tinc/*/rsa_key.priv
+rsa_key.priv
+hosts/
+
+# TLS certificates (generated)
+# Note: Certificate files in deploy/*/certs/ are tracked for documentation
+*.key
+*.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
