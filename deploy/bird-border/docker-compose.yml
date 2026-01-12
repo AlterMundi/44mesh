@@ -7,7 +7,7 @@
 
 services:
   netclient:
-    image: gravitl/netclient:v0.24.2
+    image: gravitl/netclient:latest
     container_name: netclient
     cap_add:
       - NET_ADMIN
@@ -31,8 +31,6 @@ services:
     network_mode: host
     cap_add:
       - NET_ADMIN
-    env_file:
-      - .env
     environment:
       # BGP Configuration
       - BORDER_ROUTER_AS=${BORDER_ROUTER_AS:-42000}
