@@ -59,6 +59,18 @@ services:
       - "8081:80"
     restart: unless-stopped
 
+  # Netmaker UI Dashboard
+  netmaker-ui:
+    image: gravitl/netmaker-ui:v0.24.2
+    container_name: netmaker-ui
+    environment:
+      BACKEND_URL: "https://${SERVER_HOST}"
+    depends_on:
+      - netmaker
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
 volumes:
   netmaker_data:
   netmaker_certs:
