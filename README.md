@@ -1,4 +1,4 @@
-# BGP4mesh
+# 44Mesh
 
 Run your own Autonomous System (AS) with BGP peering and a WireGuard mesh network.
 
