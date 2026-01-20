@@ -8,9 +8,6 @@ on:
       - opened
       - synchronize
       - reopened
-  push:
-    branches:
-      - "stage"
 
 concurrency:
   group: bird-border-deploy
