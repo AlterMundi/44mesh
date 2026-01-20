@@ -150,7 +150,7 @@ ping <mesh-node-ip>  # any IP in ${MESH_ADDRESS_RANGE}
 Configuration is managed via environment variables in `.env`:
 
 - **Export to ISP**: `${MESH_ADDRESS_RANGE}` (mesh network)
-- **Import from ISP**: Test prefixes (`${TEST_PREFIX_1}`, `${TEST_PREFIX_2}`, `${TEST_PREFIX_3}`)
+- **Import from ISP**: All routes from peer (works for both iBGP and eBGP)
 
 The BIRD configuration is generated from `bird.conf.template` at container startup using values from your `.env` file.
 
