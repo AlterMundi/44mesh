@@ -26,7 +26,7 @@ jobs:
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose up -d --build
+        run: docker compose --env-file /root/REPOS/44Mesh/deploy/bird-border/.env up -d --build
 
       - name: Wait for netclient healthy and bird running
         shell: bash
