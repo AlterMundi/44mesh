@@ -1,0 +1,70 @@
+name: Deploy bird-border on PR
+
+on:
+  pull_request:
+    branches:
+      - "stage"
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - "stage"
+
+concurrency:
+  group: bird-border-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy bird-border containers
+        working-directory: deploy/bird-border
+        run: docker compose up -d --build
+
+      - name: Wait for netclient healthy and bird running
+        shell: bash
+        run: |
+          timeout=180
+          interval=5
+          elapsed=0
+
+          while [ $elapsed -lt $timeout ]; do
+            netclient_health="$(docker inspect -f '{{.State.Health.Status}}' netclient 2>/dev/null || true)"
+            bird_state="$(docker inspect -f '{{.State.Status}}' bird-border 2>/dev/null || true)"
+
+            if [ "$netclient_health" = "healthy" ] && [ "$bird_state" = "running" ]; then
+              echo "netclient is healthy and bird-border is running."
+              exit 0
+            fi
+
+            echo "Waiting... netclient=$netclient_health bird=$bird_state"
+            sleep "$interval"
+            elapsed=$((elapsed + interval))
+          done
+
+          echo "Timeout waiting for healthy containers."
+          docker ps -a
+          exit 1
+
+      - name: Show bird status
+        run: docker exec bird-border birdc show status
+
+      - name: Write job summary
+        run: |
+          {
+            echo "## Bird-border deployment"
+            echo ""
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Ref: ${{ github.ref }}"
+            echo "- SHA: ${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
