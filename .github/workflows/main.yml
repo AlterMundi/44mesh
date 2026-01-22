@@ -35,11 +35,11 @@ jobs:
 
       - name: Deploy netmaker containers
         working-directory: deploy/netmaker
-        run: docker compose up -d
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.netmaker up -d
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose up -d --build
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d --build
 
       - name: Wait for netclient healthy and bird running
         shell: bash
