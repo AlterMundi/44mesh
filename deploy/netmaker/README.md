@@ -104,7 +104,7 @@ curl https://${SERVER_HOST}/api/server/health
 
 ```bash
 # Install netclient
-curl -sL 'https://raw.githubusercontent.com/gravitl/netmaker/master/scripts/netclient-install.sh' | sudo VERSION=v0.24.2 bash
+curl -sL 'https://raw.githubusercontent.com/gravitl/netmaker/master/scripts/netclient-install.sh' | sudo bash
 
 # Join network
 netclient join -t <ENROLLMENT_TOKEN>
