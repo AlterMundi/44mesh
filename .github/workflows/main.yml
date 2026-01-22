@@ -1,4 +1,4 @@
-name: Deploy bird-border on PR
+name: Deploy bird-border and netmaker on PR
 
 on:
   pull_request:
@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Deploy netmaker containers
+        working-directory: deploy/netmaker
+        run: docker compose --env-file /home/github-runner/REPOS/44mesh/deploy/netmaker/.env up -d
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
@@ -59,8 +63,13 @@ jobs:
       - name: Write job summary
         run: |
           {
-            echo "## Bird-border deployment"
+            echo "## Deployment Summary"
             echo ""
+            echo "### Deployments"
+            echo "- ✅ Netmaker (netmaker, netmaker-ui, mq)"
+            echo "- ✅ Bird-border (netclient, bird)"
+            echo ""
+            echo "### Details"
             echo "- Event: ${{ github.event_name }}"
             echo "- Ref: ${{ github.ref }}"
             echo "- SHA: ${{ github.sha }}"
