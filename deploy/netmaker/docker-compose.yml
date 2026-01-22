@@ -4,7 +4,7 @@
 services:
   # Netmaker Server
   netmaker:
-    image: gravitl/netmaker:v0.24.2
+    image: gravitl/netmaker:latest
     container_name: netmaker
     cap_add:
       - NET_ADMIN
@@ -49,19 +49,7 @@ services:
   # Netmaker UI Dashboard
   # Replaces netmaker-placeholder-temp container
   netmaker-ui:
-    image: gravitl/netmaker-ui:v0.24.2
-    container_name: netmaker-ui
-    environment:
-      BACKEND_URL: "https://${SERVER_HOST}"
-    depends_on:
-      - netmaker
-    ports:
-      - "8081:80"
-    restart: unless-stopped
-
-  # Netmaker UI Dashboard
-  netmaker-ui:
-    image: gravitl/netmaker-ui:v0.24.2
+    image: gravitl/netmaker-ui:latest
     container_name: netmaker-ui
     environment:
       BACKEND_URL: "https://${SERVER_HOST}"

@@ -4,11 +4,11 @@
 
 | Container | Image | Function |
 |-----------|-------|----------|
-| netmaker | gravitl/netmaker:v0.24.2 | Server, manages mesh topology |
-| netmaker-ui | gravitl/netmaker-ui:v0.24.2 | Web dashboard for visual management |
+| netmaker | gravitl/netmaker:latest | Server, manages mesh topology |
+| netmaker-ui | gravitl/netmaker-ui:latest | Web dashboard for visual management |
 | netmaker-mq | eclipse-mosquitto:2 | MQTT broker for node communication |
 | caddy | caddy:2-alpine | TLS termination (HTTPS required by netclient) |
-| netclient | gravitl/netclient:v0.24.2 | WireGuard client on each mesh node |
+| netclient | gravitl/netclient:latest | WireGuard client on each mesh node |
 
 ## Network
 
