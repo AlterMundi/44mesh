@@ -26,7 +26,7 @@ jobs:
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose --env-file /root/REPOS/44Mesh/deploy/bird-border/.env up -d --build
+        run: docker compose --env-file /home/github-runner/REPOS/44mesh/deploy/bird-border/.env up -d --build
 
       - name: Wait for netclient healthy and bird running
         shell: bash
@@ -64,4 +64,6 @@ jobs:
             echo "- Event: ${{ github.event_name }}"
             echo "- Ref: ${{ github.ref }}"
             echo "- SHA: ${{ github.sha }}"
+            echo "- PR: #${{ github.event.pull_request.number }}"
+            echo "- Branch: ${{ github.head_ref }}"
           } >> "$GITHUB_STEP_SUMMARY"
