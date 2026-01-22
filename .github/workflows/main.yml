@@ -23,14 +23,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify checkout
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Git branch: $(git branch --show-current)"
+          echo "Git SHA: $(git rev-parse HEAD)"
+          echo "Expected SHA: ${{ github.event.pull_request.head.sha }}"
 
       - name: Deploy netmaker containers
         working-directory: deploy/netmaker
-        run: docker compose --env-file /home/github-runner/REPOS/44mesh/deploy/netmaker/.env up -d
+        run: docker compose up -d
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose --env-file /home/github-runner/REPOS/44mesh/deploy/bird-border/.env up -d --build
+        run: docker compose up -d --build
 
       - name: Wait for netclient healthy and bird running
         shell: bash
