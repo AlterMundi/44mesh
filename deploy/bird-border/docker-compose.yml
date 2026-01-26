@@ -7,7 +7,7 @@
 
 services:
   netclient:
-    image: gravitl/netclient:v0.24.2
+    image: gravitl/netclient:v1.4.0
     container_name: netclient
     cap_add:
       - NET_ADMIN
