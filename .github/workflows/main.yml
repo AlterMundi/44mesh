@@ -3,7 +3,7 @@ name: Deploy bird-border and netmaker on PR
 on:
   pull_request:
     branches:
-      - "stage"
+      - "main"
     types:
       - opened
       - synchronize
