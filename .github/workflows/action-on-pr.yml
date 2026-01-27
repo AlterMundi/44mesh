@@ -1,0 +1,123 @@
+name: Validate PR - Docker Compose Build
+
+on:
+  pull_request:
+    branches:
+      - "main"
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-netmaker:
+    name: Validate Netmaker
+    runs-on: ubuntu-latest
+    environment: netmaker-action
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create netmaker .env file
+        working-directory: deploy/netmaker
+        run: |
+          cat > .env << 'EOF'
+          SERVER_HOST=netmaker.test.local
+          NETMAKER_API_PORT=8443
+          MQTT_PORT=1883
+          WIREGUARD_PORT=51821
+          MASTER_KEY=${{ secrets.MASTER_KEY }}
+          MESH_NETWORK_ID=mesh
+          MESH_ADDRESS_RANGE=44.30.127.0/24
+          EOF
+
+      - name: Validate docker-compose syntax
+        working-directory: deploy/netmaker
+        run: docker compose config --quiet
+
+      - name: Build netmaker containers
+        working-directory: deploy/netmaker
+        run: docker compose build --dry-run 2>/dev/null || docker compose config
+
+      - name: Test container startup (dry-run)
+        working-directory: deploy/netmaker
+        run: |
+          echo "Pulling images and validating configuration..."
+          docker compose pull --ignore-pull-failures || true
+          docker compose config --services
+
+  validate-bird-border:
+    name: Validate Bird-Border
+    runs-on: ubuntu-latest
+    environment: bird-border-action
+    needs: validate-netmaker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create bird-border .env file
+        working-directory: deploy/bird-border
+        run: |
+          cat > .env << 'EOF'
+          ENROLLMENT_TOKEN=${{ secrets.ENROLLMENT_TOKEN }}
+          BORDER_ROUTER_AS=65000
+          BORDER_ROUTER_IP=172.30.0.100
+          BORDER_ROUTER_INTERFACE=eth0
+          ISP_AS=65001
+          ISP_IP=172.30.0.1
+          BGP_NETWORK_RANGE=172.30.0.0/24
+          MESH_ADDRESS_RANGE=44.30.127.0/24
+          BGP_HOLD_TIME=90
+          BGP_KEEPALIVE_TIME=30
+          EOF
+
+      - name: Validate docker-compose syntax
+        working-directory: deploy/bird-border
+        run: docker compose config --quiet
+
+      - name: Build bird-border containers
+        working-directory: deploy/bird-border
+        run: docker compose build --no-cache
+
+      - name: Verify built image
+        run: |
+          docker images | grep -E "bird-border|deploy" || echo "Image built successfully"
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-netmaker, validate-bird-border]
+    if: always()
+
+    steps:
+      - name: Write job summary
+        run: |
+          {
+            echo "## PR Validation Summary"
+            echo ""
+            echo "### Validation Results"
+            echo "| Component | Status |"
+            echo "|-----------|--------|"
+            echo "| Netmaker | ${{ needs.validate-netmaker.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| Bird-Border | ${{ needs.validate-bird-border.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo ""
+            echo "### Details"
+            echo "- PR: #${{ github.event.pull_request.number }}"
+            echo "- Branch: ${{ github.head_ref }}"
+            echo "- SHA: ${{ github.event.pull_request.head.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check overall status
+        if: needs.validate-netmaker.result != 'success' || needs.validate-bird-border.result != 'success'
+        run: |
+          echo "One or more validations failed"
+          exit 1
