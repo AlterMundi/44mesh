@@ -47,12 +47,9 @@ jobs:
         working-directory: deploy/netmaker
         run: docker compose build --dry-run 2>/dev/null || docker compose config
 
-      - name: Test container startup (dry-run)
+      - name: List validated services
         working-directory: deploy/netmaker
-        run: |
-          echo "Pulling images and validating configuration..."
-          docker compose pull --ignore-pull-failures || true
-          docker compose config --services
+        run: docker compose config --services
 
   validate-bird-border:
     name: Validate Bird-Border
