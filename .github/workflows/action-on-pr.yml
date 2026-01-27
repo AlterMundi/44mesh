@@ -45,7 +45,7 @@ jobs:
 
       - name: Build netmaker containers
         working-directory: deploy/netmaker
-        run: docker compose build --dry-run 2>/dev/null || docker compose config
+        run: docker compose buid --dry-run 2>/dev/null || docker compose config
 
       - name: List validated services
         working-directory: deploy/netmaker
