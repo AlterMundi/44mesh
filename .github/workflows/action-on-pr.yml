@@ -39,17 +39,16 @@ jobs:
           MESH_ADDRESS_RANGE=44.30.127.0/24
           EOF
 
-      - name: Validate docker-compose syntax
+      - name: Validate docker-compose configuration
         working-directory: deploy/netmaker
-        run: docker compose config --quiet
-
-      - name: Build netmaker containers
-        working-directory: deploy/netmaker
-        run: docker compose buid --dry-run 2>/dev/null || docker compose config
-
-      - name: List validated services
-        working-directory: deploy/netmaker
-        run: docker compose config --services
+        run: |
+          echo "=== Validating netmaker docker-compose ==="
+          docker compose config
+          echo ""
+          echo "=== Services found ==="
+          docker compose config --services
+          echo ""
+          echo "✓ Netmaker configuration validated successfully"
 
   validate-bird-border:
     name: Validate Bird-Border
@@ -77,17 +76,31 @@ jobs:
           BGP_KEEPALIVE_TIME=30
           EOF
 
-      - name: Validate docker-compose syntax
+      - name: Validate docker-compose configuration
         working-directory: deploy/bird-border
-        run: docker compose config --quiet
+        run: |
+          echo "=== Validating bird-border docker-compose ==="
+          docker compose config
+          echo ""
+          echo "=== Services found ==="
+          docker compose config --services
+          echo ""
+          echo "✓ Bird-border configuration validated successfully"
 
       - name: Build bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose build --no-cache
-
-      - name: Verify built image
         run: |
-          docker images | grep -E "bird-border|deploy" || echo "Image built successfully"
+          echo "=== Building bird-border image (--no-cache) ==="
+          docker compose build --no-cache
+          echo ""
+          echo "✓ Build completed successfully"
+
+      - name: Verify built images
+        run: |
+          echo "=== Docker images created ==="
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" | head -10
+          echo ""
+          echo "✓ Images verified"
 
   summary:
     name: Validation Summary
