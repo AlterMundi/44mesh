@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: bird-border-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -63,6 +63,66 @@ jobs:
       - name: Show bird status
         run: docker exec bird-border birdc show status
 
+      - name: Load monitoring environment
+        run: |
+          cat /home/github-runner/configs/44mesh/.env.monitoring >> "$GITHUB_ENV"
+
+      - name: Deploy monitoring stack
+        working-directory: deploy/monitoring
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.monitoring up -d --build
+
+      - name: Update monitoring infrastructure configs
+        run: |
+          # Substitute placeholders in scrape config using envsubst (safe against special chars)
+          export VM_BRIDGE_GATEWAY GRAFANA_DATASOURCE_UID
+          envsubst '${VM_BRIDGE_GATEWAY}' \
+            < deploy/monitoring/vmconfig-scrape-additions.yml > /tmp/scrape-additions-resolved.yml
+
+          sudo cp "${MONITORING_BASE_DIR}/vmconfig/scrape.yml" /tmp/scrape.yml.work
+          sudo chown $(whoami) /tmp/scrape.yml.work
+          ADDITIONS=/tmp/scrape-additions-resolved.yml VM_CONFIG=/tmp/scrape.yml.work \
+            python3 deploy/monitoring/merge-scrape-config.py
+          sudo mv /tmp/scrape.yml.work "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
+          sudo chmod 644 "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
+
+          # Substitute datasource UID in dashboard and alert files
+          envsubst '${GRAFANA_DATASOURCE_UID}' \
+            < deploy/monitoring/dashboards/44mesh-health.json > /tmp/44mesh-health.json
+          envsubst '${GRAFANA_DATASOURCE_UID}' \
+            < deploy/monitoring/alerting/44mesh-alerts.yml > /tmp/44mesh-alerts.yml
+
+          # Copy resolved Grafana dashboard
+          sudo mkdir -p "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh"
+          sudo cp /tmp/44mesh-health.json "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh/"
+
+          # Copy resolved Grafana alerting rules
+          sudo mkdir -p "${MONITORING_BASE_DIR}/grafana/provisioning/alerting"
+          sudo cp /tmp/44mesh-alerts.yml "${MONITORING_BASE_DIR}/grafana/provisioning/alerting/"
+
+          # Add 44mesh dashboard provider (separate file, won't overwrite existing providers)
+          sudo cp deploy/monitoring/grafana-dashboard-provider.yml \
+            "${MONITORING_BASE_DIR}/grafana/provisioning/dashboards/44mesh-provider.yml"
+
+          # Reload VictoriaMetrics scrape config (hot reload)
+          curl -sf -X POST "http://127.0.0.1:${VM_PORT}/-/reload"
+
+          # Restart Grafana to pick up new providers and alerting
+          sudo docker restart "${GRAFANA_CONTAINER}"
+
+      - name: Verify monitoring
+        run: |
+          sleep 10
+          echo "--- Process Exporter ---"
+          curl -sf http://127.0.0.1:9256/metrics | grep -c namedprocess || echo "WARN: process-exporter not responding"
+          echo "--- Mesh Watchdog ---"
+          curl -sf "http://127.0.0.1:${WATCHDOG_PORT}/metrics" | grep -c mesh_ || echo "WARN: mesh-watchdog not responding"
+
+      - name: Cleanup temp files
+        if: always()
+        run: |
+          rm -f /tmp/scrape-additions-resolved.yml /tmp/scrape.yml.work
+          rm -f /tmp/44mesh-health.json /tmp/44mesh-alerts.yml
+
       - name: Write job summary
         run: |
           {
@@ -71,6 +131,7 @@ jobs:
             echo "### Deployments"
             echo "- ✅ Netmaker (netmaker, netmaker-ui, mq)"
             echo "- ✅ Bird-border (netclient, bird)"
+            echo "- ✅ Monitoring (process-exporter, mesh-watchdog)"
             echo ""
             echo "### Details"
             echo "- Event: ${{ github.event_name }}"

@@ -102,10 +102,56 @@ jobs:
           echo ""
           echo "✓ Images verified"
 
+  validate-monitoring:
+    name: Validate Monitoring
+    runs-on: ubuntu-latest
+    needs: validate-netmaker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create monitoring .env file
+        working-directory: deploy/monitoring
+        run: |
+          cat > .env << 'EOF'
+          MONITORING_NETWORK=test-network
+          WATCHDOG_PORT=9257
+          LISTEN_ADDR=127.0.0.1
+          COLLECT_INTERVAL=15
+          NETMAKER_API_URL=http://127.0.0.1:8443
+          MQTT_HOST=127.0.0.1
+          MQTT_PORT=1883
+          DNS_TEST_DOMAIN=google.com
+          DNS_TEST_INTERNAL=netmaker.altermundi.net
+          EOF
+
+      - name: Create test Docker network
+        run: docker network create test-network
+
+      - name: Validate docker-compose configuration
+        working-directory: deploy/monitoring
+        run: |
+          echo "=== Validating monitoring docker-compose ==="
+          docker compose config
+          echo ""
+          echo "=== Services found ==="
+          docker compose config --services
+          echo ""
+          echo "✓ Monitoring configuration validated successfully"
+
+      - name: Build monitoring containers
+        working-directory: deploy/monitoring
+        run: |
+          echo "=== Building mesh-watchdog image (--no-cache) ==="
+          docker compose build --no-cache
+          echo ""
+          echo "✓ Build completed successfully"
+
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [validate-netmaker, validate-bird-border]
+    needs: [validate-netmaker, validate-bird-border, validate-monitoring]
     if: always()
 
     steps:
@@ -119,6 +165,7 @@ jobs:
             echo "|-----------|--------|"
             echo "| Netmaker | ${{ needs.validate-netmaker.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo "| Bird-Border | ${{ needs.validate-bird-border.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| Monitoring | ${{ needs.validate-monitoring.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo ""
             echo "### Details"
             echo "- PR: #${{ github.event.pull_request.number }}"
@@ -127,7 +174,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check overall status
-        if: needs.validate-netmaker.result != 'success' || needs.validate-bird-border.result != 'success'
+        if: needs.validate-netmaker.result != 'success' || needs.validate-bird-border.result != 'success' || needs.validate-monitoring.result != 'success'
         run: |
           echo "One or more validations failed"
           exit 1
