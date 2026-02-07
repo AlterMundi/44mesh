@@ -5,7 +5,7 @@ groups:
   - orgId: 1
     name: 44mesh-netclient
     folder: 44mesh
-    interval: 15s
+    interval: 10s
     rules:
       # 1 -- Netclient FD Leak Warning --
       - uid: 44mesh-fd-warn
@@ -187,7 +187,7 @@ groups:
   - orgId: 1
     name: 44mesh-infrastructure
     folder: 44mesh
-    interval: 15s
+    interval: 10s
     rules:
       # 5 -- DNS Resolution Failed --
       - uid: 44mesh-dns-fail
