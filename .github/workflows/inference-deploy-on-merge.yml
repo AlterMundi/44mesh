@@ -73,16 +73,18 @@ jobs:
 
       - name: Update monitoring infrastructure configs
         run: |
+          # Take ownership of monitoring dirs (allowed by sudoers: chown -R github-runner:github-runner /opt/*)
+          sudo chown -R github-runner:github-runner "${MONITORING_BASE_DIR}"
+
           # Substitute placeholders in scrape config using envsubst (safe against special chars)
           export VM_BRIDGE_GATEWAY GRAFANA_DATASOURCE_UID
           envsubst '${VM_BRIDGE_GATEWAY}' \
             < deploy/monitoring/vmconfig-scrape-additions.yml > /tmp/scrape-additions-resolved.yml
 
-          sudo cp "${MONITORING_BASE_DIR}/vmconfig/scrape.yml" /tmp/scrape.yml.work
-          sudo chown $(whoami) /tmp/scrape.yml.work
+          cp "${MONITORING_BASE_DIR}/vmconfig/scrape.yml" /tmp/scrape.yml.work
           ADDITIONS=/tmp/scrape-additions-resolved.yml VM_CONFIG=/tmp/scrape.yml.work \
             python3 deploy/monitoring/merge-scrape-config.py
-          sudo mv /tmp/scrape.yml.work "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
+          mv /tmp/scrape.yml.work "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
           sudo chmod 644 "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
 
           # Substitute datasource UID in dashboard and alert files
@@ -92,16 +94,19 @@ jobs:
             < deploy/monitoring/alerting/44mesh-alerts.yml > /tmp/44mesh-alerts.yml
 
           # Copy resolved Grafana dashboard
-          sudo mkdir -p "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh"
-          sudo cp /tmp/44mesh-health.json "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh/"
+          mkdir -p "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh"
+          cp /tmp/44mesh-health.json "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh/"
 
           # Copy resolved Grafana alerting rules
-          sudo mkdir -p "${MONITORING_BASE_DIR}/grafana/provisioning/alerting"
-          sudo cp /tmp/44mesh-alerts.yml "${MONITORING_BASE_DIR}/grafana/provisioning/alerting/"
+          mkdir -p "${MONITORING_BASE_DIR}/grafana/provisioning/alerting"
+          cp /tmp/44mesh-alerts.yml "${MONITORING_BASE_DIR}/grafana/provisioning/alerting/"
 
           # Add 44mesh dashboard provider (separate file, won't overwrite existing providers)
-          sudo cp deploy/monitoring/grafana-dashboard-provider.yml \
+          cp deploy/monitoring/grafana-dashboard-provider.yml \
             "${MONITORING_BASE_DIR}/grafana/provisioning/dashboards/44mesh-provider.yml"
+
+          # Restore ownership to service:service
+          sudo chown -R service:service "${MONITORING_BASE_DIR}"
 
           # Reload VictoriaMetrics scrape config (hot reload)
           curl -sf -X POST "http://127.0.0.1:${VM_PORT}/-/reload"
