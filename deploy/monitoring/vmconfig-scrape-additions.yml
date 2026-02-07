@@ -1,0 +1,19 @@
+scrape_configs:
+  - job_name: '44mesh-process-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['44mesh-process-exporter:9256']
+        labels:
+          node_id: 'inference-public'
+          stack: '44mesh'
+
+  - job_name: '44mesh-watchdog'
+    scrape_interval: 15s
+    static_configs:
+      # mesh-watchdog runs with network_mode:host
+      # VictoriaMetrics reaches it via the monitoring network bridge gateway
+      # The target IP is substituted at deploy time from VM_BRIDGE_GATEWAY env var
+      - targets: ['${VM_BRIDGE_GATEWAY}:9257']
+        labels:
+          node_id: 'inference-public'
+          stack: '44mesh'

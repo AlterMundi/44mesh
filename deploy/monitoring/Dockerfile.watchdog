@@ -1,0 +1,18 @@
+FROM alpine:3.21.6
+
+RUN apk add --no-cache \
+    python3 \
+    curl \
+    bind-tools \
+    mosquitto-clients \
+    wireguard-tools
+
+RUN mkdir -p /app/data
+
+COPY mesh-watchdog.sh /app/mesh-watchdog.sh
+RUN chmod +x /app/mesh-watchdog.sh
+
+WORKDIR /app
+EXPOSE 9257
+
+CMD ["/app/mesh-watchdog.sh"]
