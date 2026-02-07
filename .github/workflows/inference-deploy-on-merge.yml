@@ -112,7 +112,7 @@ jobs:
           curl -sf -X POST "http://127.0.0.1:${VM_PORT}/-/reload"
 
           # Restart Grafana to pick up new providers and alerting
-          sudo docker restart "${GRAFANA_CONTAINER}"
+          docker restart "${GRAFANA_CONTAINER}"
 
       - name: Verify monitoring
         run: |
