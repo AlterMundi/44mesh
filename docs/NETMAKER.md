@@ -8,7 +8,7 @@
 | netmaker-ui | gravitl/netmaker-ui:latest | Web dashboard for visual management |
 | netmaker-mq | eclipse-mosquitto:2 | MQTT broker for node communication |
 | caddy | caddy:2-alpine | TLS termination (HTTPS required by netclient) |
-| netclient | gravitl/netclient:latest | WireGuard client on each mesh node |
+| netclient | altermundi/netclient:fix-dns-socket-leak | WireGuard client (patched: bounded conn pool + circuit breaker) |
 
 ## Network
 

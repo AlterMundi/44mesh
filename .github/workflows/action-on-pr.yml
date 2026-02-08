@@ -76,6 +76,13 @@ jobs:
           BGP_KEEPALIVE_TIME=30
           EOF
 
+      - name: Build patched netclient image
+        run: |
+          git clone --branch fix/dns-socket-leak --depth 1 \
+            https://github.com/AlterMundi/netclient.git /tmp/netclient-build
+          docker build -t altermundi/netclient:fix-dns-socket-leak /tmp/netclient-build
+          rm -rf /tmp/netclient-build
+
       - name: Validate docker-compose configuration
         working-directory: deploy/bird-border
         run: |

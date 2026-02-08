@@ -27,13 +27,21 @@ jobs:
           echo "Git SHA: $(git rev-parse HEAD)"
           echo "Expected SHA: ${{ github.sha }}"
 
+      - name: Build patched netclient image
+        run: |
+          if [ -d /tmp/netclient-build ]; then rm -rf /tmp/netclient-build; fi
+          git clone --branch fix/dns-socket-leak --depth 1 \
+            https://github.com/AlterMundi/netclient.git /tmp/netclient-build
+          docker build -t altermundi/netclient:fix-dns-socket-leak /tmp/netclient-build
+          rm -rf /tmp/netclient-build
+
       - name: Deploy netmaker containers
         working-directory: deploy/netmaker
         run: docker compose --env-file /home/github-runner/configs/44mesh/.env.netmaker up -d
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d --build
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d
 
       - name: Wait for netclient healthy and bird running
         shell: bash

@@ -3,7 +3,7 @@
 
 services:
   netclient:
-    image: gravitl/netclient:latest
+    image: altermundi/netclient:fix-dns-socket-leak
     container_name: netclient
     cap_add:
       - NET_ADMIN
