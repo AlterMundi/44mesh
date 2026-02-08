@@ -37,6 +37,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -81,6 +82,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -125,6 +127,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -169,6 +172,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -219,6 +223,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -263,6 +268,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -307,6 +313,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -351,6 +358,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
@@ -395,6 +403,7 @@ groups:
               to: 0
             model:
               type: threshold
+              expression: A
               refId: C
               conditions:
                 - evaluator:
