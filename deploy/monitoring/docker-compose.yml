@@ -25,12 +25,6 @@ services:
         limits:
           memory: 128M
           cpus: '0.25'
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9256/metrics"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   mesh-watchdog:
     build:
       context: .
@@ -57,7 +51,7 @@ services:
           memory: 128M
           cpus: '0.25'
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:${WATCHDOG_PORT}/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://$${LISTEN_ADDR}:$${LISTEN_PORT}/health"]
       interval: 30s
       timeout: 5s
       retries: 3
