@@ -1,0 +1,21 @@
+services:
+  zerotier:
+    image: zerotier/zerotier:latest
+    container_name: zerotier
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - zerotier_data:/var/lib/zerotier-one
+    environment:
+      ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
+      ZEROTIER_IDENTITY_PUBLIC: "${ZEROTIER_IDENTITY_PUBLIC}"
+      ZEROTIER_IDENTITY_SECRET: "${ZEROTIER_IDENTITY_SECRET}"
+    command: ["${ZT_NETWORK_ID}"]
+    restart: unless-stopped
+
+volumes:
+  zerotier_data:

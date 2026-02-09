@@ -1,24 +1,27 @@
 # Border Router Node
-# BGP peering with ISP + Netmaker mesh connectivity
+# BGP peering with ISP + ZeroTier mesh connectivity
 #
 # Components:
-#   - netclient: WireGuard mesh (connects to netmaker.altermundi.net)
+#   - zerotier: mesh client (joins ZeroTier network)
 #   - bird: BGP daemon (peers with RPi ISP at 172.30.0.1)
 
 services:
-  netclient:
-    image: altermundi/netclient:fix-dns-socket-leak
-    container_name: netclient
+  zerotier:
+    image: zerotier/zerotier:latest
+    container_name: zerotier
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
+      - SYS_ADMIN
     network_mode: host
+    devices:
+      - /dev/net/tun:/dev/net/tun
     volumes:
-      - netclient_data:/etc/netclient
+      - zerotier_data:/var/lib/zerotier-one
     environment:
-      TOKEN: "${ENROLLMENT_TOKEN}"
+      ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
+    command: ["${ZT_NETWORK_ID}"]
     healthcheck:
-      test: ["CMD-SHELL", "wg show | grep -q 'interface:'"]
+      test: ["CMD-SHELL", "ip link show | grep -q '^zt'"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -43,9 +46,9 @@ services:
     volumes:
       - ./bird.conf.template:/etc/bird/bird.conf.template:ro
     depends_on:
-      netclient:
+      zerotier:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  netclient_data:
+  zerotier_data:

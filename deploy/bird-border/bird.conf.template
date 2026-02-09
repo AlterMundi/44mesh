@@ -1,5 +1,5 @@
 # BIRD - Border Router (AS ${BORDER_ROUTER_AS})
-# Routes between ISP and Netmaker mesh
+# Routes between ISP and ZeroTier mesh
 
 router id ${BORDER_ROUTER_IP};
 
@@ -16,10 +16,10 @@ protocol kernel {
     };
 }
 
-# Direct routes - learn Netmaker interface
+# Direct routes - learn ZeroTier interface
 protocol direct {
     ipv4;
-    interface "netmaker", "nm-*";  # Netmaker WireGuard interface
+    interface "zt*";
 }
 
 # BGP peering (iBGP or eBGP depending on AS configuration)

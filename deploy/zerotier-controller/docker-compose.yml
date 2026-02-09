@@ -1,0 +1,41 @@
+services:
+  zerotier-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.controller
+      args:
+        ZEROTIER_VERSION: ${ZEROTIER_VERSION:-1.16.0}
+    container_name: zerotier-controller
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - zerotier_data:/var/lib/zerotier-one
+    restart: unless-stopped
+
+  ztncui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ztncui
+    container_name: ztncui
+    network_mode: host
+    environment:
+      ZT_ADDR: "127.0.0.1:9993"
+      ZTNCUI_HTTP_PORT: "${ZTNCUI_HTTP_PORT}"
+      ZTNCUI_HTTPS_PORT: "${ZTNCUI_HTTPS_PORT}"
+      ZTNCUI_HTTP_ALL_INTERFACES: "${ZTNCUI_HTTP_ALL_INTERFACES}"
+      ZTNCUI_HTTPS_HOST: "${ZTNCUI_HTTPS_HOST}"
+      ZTNCUI_PASSWD: "${ZTNCUI_PASSWD}"
+    volumes:
+      - zerotier_data:/var/lib/zerotier-one
+      - ztncui_data:/opt/key-networks/ztncui/etc
+    depends_on:
+      - zerotier-controller
+    restart: unless-stopped
+
+volumes:
+  zerotier_data:
+  ztncui_data:

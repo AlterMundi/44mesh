@@ -1,0 +1,35 @@
+FROM ubuntu:22.04 AS build
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    pkg-config \
+    libssl-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+ARG ZEROTIER_VERSION=1.16.0
+
+WORKDIR /src
+RUN git clone --branch "v${ZEROTIER_VERSION}" --depth 1 https://github.com/zerotier/ZeroTierOne.git .
+
+RUN make -j"$(nproc)" ZT_NONFREE=1
+
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/zerotier-one /usr/local/sbin/zerotier-one
+COPY --from=build /src/zerotier-cli /usr/local/bin/zerotier-cli
+COPY --from=build /src/zerotier-idtool /usr/local/bin/zerotier-idtool
+
+VOLUME /var/lib/zerotier-one
+
+EXPOSE 9993/udp
+EXPOSE 9993/tcp
+
+ENTRYPOINT ["/usr/local/sbin/zerotier-one"]
+CMD ["-U", "/var/lib/zerotier-one"]
