@@ -1,0 +1,33 @@
+FROM node:14-bullseye
+
+RUN apt-get update && apt-get install -y \
+    git \
+    python3 \
+    make \
+    g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/key-networks
+RUN git clone --depth 1 https://github.com/key-networks/ztncui /opt/key-networks/ztncui
+
+WORKDIR /opt/key-networks/ztncui/src
+RUN npm install
+
+WORKDIR /opt/key-networks/ztncui
+RUN cp -v etc/default.passwd etc/passwd
+
+COPY ztncui-entrypoint.sh /usr/local/bin/ztncui-entrypoint.sh
+RUN chmod +x /usr/local/bin/ztncui-entrypoint.sh
+
+ENV NODE_ENV=production
+ENV ZT_ADDR=127.0.0.1:9993
+ENV ZTNCUI_HTTP_PORT=3000
+ENV ZTNCUI_HTTPS_PORT=3443
+ENV ZTNCUI_HTTP_ALL_INTERFACES=
+ENV ZTNCUI_HTTPS_HOST=
+ENV ZTNCUI_PASSWD=password
+
+EXPOSE 3000
+EXPOSE 3443
+
+ENTRYPOINT ["/usr/local/bin/ztncui-entrypoint.sh"]

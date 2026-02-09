@@ -1,12 +1,12 @@
 # 44Mesh
 
-Run your own Autonomous System (AS) with BGP peering and a WireGuard mesh network.
+Run your own Autonomous System (AS) with BGP peering and a ZeroTier mesh network.
 
 ## Goal
 
 Create an independent AS that:
 - Announces your IP block to the Internet via BGP
-- Provides connectivity to distributed nodes through a WireGuard mesh
+- Provides connectivity to distributed nodes through a ZeroTier mesh
 - Enables you to host services accessible from the public Internet
 
 ## Architecture
@@ -27,19 +27,18 @@ Create an independent AS that:
 │                         BORDER ROUTER (your AS)                             │
 │                                                                             │
 │   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                  │
-│   │    BIRD     │     │  netclient  │     │  Egress GW  │                  │
-│   │  AS 65000   │     │  (WireGuard)│     │  announces  │                  │
-│   │             │     │             │     │  external   │                  │
-│   │ announces:  │     │ mesh IP:    │     │  routes to  │                  │
-│   │ ${MESH_    │     │ from range  │     │  mesh       │                  │
+│   │    BIRD     │     │  zerotier   │     │  Egress GW  │                  │
+│   │  AS 65000   │     │  (Mesh)     │     │  announces  │                  │
+│   │             │     │             │     │  routes to  │                  │
+│   │ announces:  │     │ mesh IP:    │     │  mesh       │                  │
+│   │ ${MESH_    │     │ from range  │     │             │                  │
 │   │  ADDRESS_   │     │             │     │             │                  │
-│   │  RANGE}     │     │             │     │             │                  │
 │   └─────────────┘     └─────────────┘     └─────────────┘                  │
 │                                                                             │
-│   Connects your AS to both: Internet (BGP) and your mesh (WireGuard)       │
+│   Connects your AS to both: Internet (BGP) and your mesh (ZeroTier)        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                   │
-                                  │ WireGuard mesh (Netmaker)
+                                  │ ZeroTier mesh
                                   ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
 │   Mesh Node 1    │    │   Mesh Node 2    │    │   Mesh Node N    │
@@ -47,7 +46,7 @@ Create an independent AS that:
 │   ${MESH_       │    │   ${MESH_       │    │   ${MESH_       │
 │    ADDRESS_      │    │    ADDRESS_      │    │    ADDRESS_      │
 │    RANGE}        │    │    RANGE}        │    │    RANGE}        │
-│   netclient      │    │   netclient      │    │   netclient      │
+│   zerotier       │    │   zerotier       │    │   zerotier       │
 │   (anywhere)     │    │   (anywhere)     │    │   (anywhere)     │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
 ```
@@ -66,40 +65,37 @@ Create an independent AS that:
 1. Someone on the Internet wants to reach a mesh node IP
 2. BGP routing directs traffic to your ISP (your AS is announced)
 3. ISP sends to your **border router**
-4. Border router forwards via WireGuard mesh to the node
+4. Border router forwards via ZeroTier mesh to the node
 
 ### Key Insight: Egress Gateway
 
-The border router must be configured as an **egress gateway** in Netmaker. This announces external routes (e.g., `0.0.0.0/0` or specific ranges) to all mesh nodes, so they know how to reach the Internet through the border router.
-
-Without this, mesh nodes wouldn't know how to route responses back to external IPs.
+The border router must be configured as an **egress gateway** by routing traffic for `${MESH_ADDRESS_RANGE}` via the ZeroTier interface. All mesh nodes receive the route from the controller.
 
 ## Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `deploy/netmaker/` | Public server | Netmaker control plane (mesh management) |
+| `deploy/zerotier-controller/` | Public server | ZeroTier control plane + UI |
 | `deploy/bird-border/` | Datacenter | Border router: BGP + mesh gateway |
-| `deploy/netclient/` | Any location | Standalone mesh node |
+| `deploy/zerotier/` | Any location | Standalone mesh node |
 
-### Netmaker Server (`deploy/netmaker/`)
+### ZeroTier Controller (`deploy/zerotier-controller/`)
 
-Central control plane for the WireGuard mesh. Runs on a public server with:
-- Netmaker API (behind nginx with Let's Encrypt)
-- Mosquitto MQTT broker
-- WireGuard coordination (no traffic passes through it)
+Central control plane for the mesh. Runs on a public server with:
+- ZeroTier controller (non-free build)
+- ztncui web UI
 
 ### Border Router (`deploy/bird-border/`)
 
 The critical component that bridges your AS to the Internet:
 - **BIRD**: BGP daemon, announces your IP block to the ISP
-- **netclient**: Connects to the mesh
-- **Egress Gateway**: Announces external routes to mesh nodes
+- **zerotier**: Connects to the mesh
+- **Egress Gateway**: Announces routes to mesh nodes
 
-### Mesh Nodes (`deploy/netclient/`)
+### Mesh Nodes (`deploy/zerotier/`)
 
 Simple nodes that join the mesh:
-- Run netclient to establish WireGuard tunnels
+- Run zerotier to establish overlay
 - Receive routes from egress gateway
 - Can host services accessible from the Internet
 
@@ -108,7 +104,7 @@ Simple nodes that join the mesh:
 | Network | CIDR | Purpose |
 |---------|------|---------|
 | Your AS block | ${MESH_ADDRESS_RANGE} | Public IPs announced via BGP |
-| Mesh overlay | (same as above) | WireGuard mesh uses your public block |
+| Mesh overlay | (same as above) | ZeroTier mesh uses your public block |
 | BGP peering | ${BGP_NETWORK_RANGE} | Link between you and ISP |
 
 **Note:** In this design, mesh IPs are your public IPs. This means services on mesh nodes are directly reachable from the Internet once BGP is established.
@@ -120,7 +116,7 @@ Simple nodes that join the mesh:
 1. **IP allocation**: Obtain IP block from RIR (LACNIC, ARIN, etc.) or lease from provider
 2. **AS number**: Obtain from RIR or use private AS (64512-65534) for testing
 3. **BGP peering**: Agreement with ISP or IXP for BGP session
-4. **Public server**: For Netmaker control plane
+4. **Public server**: For ZeroTier control plane
 5. **Datacenter presence**: For border router (colocation or VPS with BGP support)
 
 ### Configuration
@@ -132,67 +128,52 @@ Before deploying, copy and customize environment files:
 cp .env.example .env
 
 # Component-specific configuration
-cp deploy/netmaker/.env.example deploy/netmaker/.env
+cp deploy/zerotier-controller/.env.example deploy/zerotier-controller/.env
 cp deploy/bird-border/.env.example deploy/bird-border/.env
-cp deploy/netclient/.env.example deploy/netclient/.env
+cp deploy/zerotier/.env.example deploy/zerotier/.env
 cp deploy/rpi-isp/.env.example deploy/rpi-isp/.env  # if using mock ISP
 ```
 
 Edit each `.env` file with your specific values. See `.env.example` files for documentation.
 
-### 1. Deploy Netmaker Server
+### 1. Deploy ZeroTier Controller
 
 ```bash
-cd deploy/netmaker
+cd deploy/zerotier-controller
 cp .env.example .env
-# Edit .env with your domain and credentials
-# Required: SERVER_HOST, MASTER_KEY
-docker compose up -d
+# Edit .env with your UI password and ports
+
+docker compose up -d --build
 ```
 
-See [deploy/netmaker/README.md](deploy/netmaker/README.md) for full instructions.
+See [deploy/zerotier-controller/README.md](deploy/zerotier-controller/README.md) for full instructions.
 
 ### 2. Create Mesh Network
 
-```bash
-source .env
-curl -X POST "https://${SERVER_HOST}/api/networks" \
-  -H "Authorization: Bearer $MASTER_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"netid\": \"${MESH_NETWORK_ID}\", \"addressrange\": \"${MESH_ADDRESS_RANGE}\"}"
-```
+Use ztncui UI to:
+- Create a network
+- Set **Auto-Assign Range** to `${MESH_ADDRESS_RANGE}`
+- Add a **Managed Route** for `${MESH_ADDRESS_RANGE}`
 
 ### 3. Deploy Border Router
 
 ```bash
 cd deploy/bird-border
 cp .env.example .env
-# Add ENROLLMENT_TOKEN from Netmaker
+# Add ZT_NETWORK_ID from ztncui
+
 docker compose up -d
 ```
 
 See [deploy/bird-border/README.md](deploy/bird-border/README.md) for BGP configuration.
 
-### 4. Configure Egress Gateway
-
-Make the border router announce external routes to the mesh:
+### 4. Deploy Mesh Nodes
 
 ```bash
-# Via Netmaker API
-curl -X POST "https://${SERVER_HOST}/api/nodes/${MESH_NETWORK_ID}/<node-id>/creategateway" \
-  -H "Authorization: Bearer $MASTER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"ranges":["0.0.0.0/0"],"natEnabled":"no"}'
-```
-
-Or use Netmaker UI: Node → Edit → Enable Egress Gateway → Add range `0.0.0.0/0`
-
-### 5. Deploy Mesh Nodes
-
-```bash
-cd deploy/netclient
+cd deploy/zerotier
 cp .env.example .env
-# Add ENROLLMENT_TOKEN
+# Add ZT_NETWORK_ID
+
 docker compose up -d
 ```
 
@@ -210,7 +191,7 @@ See [deploy/rpi-isp/README.md](deploy/rpi-isp/README.md) for full mock ISP setup
 │                 │      RANGE}         │ ${BORDER_      │
 │ announces test  │                    │  ROUTER_IP}     │
 │ prefixes        │                    │                 │
-│                 │                    │ egress gateway  │
+│                 │ egress gateway      │                 │
 └─────────────────┘                    └─────────────────┘
                                               │
                                               │ mesh
@@ -220,79 +201,11 @@ See [deploy/rpi-isp/README.md](deploy/rpi-isp/README.md) for full mock ISP setup
                                        │ ${MESH_        │
                                        │  ADDRESS_       │
                                        │  RANGE}         │
+                                       │  zerotier       │
+                                       │                 │
                                        └─────────────────┘
-```
-
-The border router needs a secondary IP in the RPi's network for BGP peering:
-```bash
-sudo ip addr add ${BORDER_ROUTER_IP}/24 dev ${BORDER_ROUTER_INTERFACE}
-```
-
-## Verification
-
-### BGP Session
-```bash
-docker exec bird-border birdc show protocols
-docker exec bird-border birdc show route
-```
-
-### Mesh Connectivity
-```bash
-docker exec netclient wg show
-ping <mesh-node-ip>  # other mesh nodes in ${MESH_ADDRESS_RANGE}
-```
-
-### End-to-End (from mock ISP)
-```bash
-# From RPi, should reach any mesh node
-ping <mesh-node-ip>  # any IP in ${MESH_ADDRESS_RANGE}
-```
-
-## Production Considerations
-
-### Security
-- Use proper TLS certificates (Let's Encrypt)
-- Enable MQTT authentication
-- Use secrets management for MASTER_KEY
-- Configure firewalls appropriately
-
-### High Availability
-- Multiple border routers with BGP failover
-- Netmaker can run in HA mode
-- Consider anycast for critical services
-
-### IP Space
-- For real deployment, use legitimately obtained IP space
-- Default config uses example ranges (update in `.env` files)
-- Contact your RIR (LACNIC, ARIN, RIPE, etc.) for production IP allocation
-
-## Project Structure
-
-```
-deploy/
-├── netmaker/           # Netmaker server (public)
-│   ├── docker-compose.yml
-│   ├── mosquitto.conf
-│   └── SETUP.md
-├── bird-border/        # Border router + netclient
-│   ├── docker-compose.yml
-│   ├── bird.conf
-│   ├── Dockerfile
-│   ├── entrypoint.sh
-│   └── SETUP.md
-└── netclient/          # Standalone mesh node
-    ├── docker-compose.yml
-    └── SETUP.md
 ```
 
 ## References
 
-- [Netmaker Documentation](https://docs.netmaker.io/)
-- [Netmaker Technical Reference](docs/NETMAKER.md) (project-specific configuration notes)
-- [BIRD Internet Routing Daemon](https://bird.network.cz/)
-- [BGP RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)
-- [WireGuard](https://www.wireguard.com/)
-
-## License
-
-MIT
+- ZeroTier Documentation

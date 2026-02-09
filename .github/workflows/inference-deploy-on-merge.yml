@@ -1,4 +1,4 @@
-name: Deploy bird-border and netmaker on merge to main
+name: Deploy bird-border and zerotier on merge to main
 
 on:
   push:
@@ -27,23 +27,15 @@ jobs:
           echo "Git SHA: $(git rev-parse HEAD)"
           echo "Expected SHA: ${{ github.sha }}"
 
-      - name: Build patched netclient image
-        run: |
-          if [ -d /tmp/netclient-build ]; then rm -rf /tmp/netclient-build; fi
-          git clone --branch fix/dns-socket-leak --depth 1 \
-            https://github.com/AlterMundi/netclient.git /tmp/netclient-build
-          docker build -t altermundi/netclient:fix-dns-socket-leak /tmp/netclient-build
-          rm -rf /tmp/netclient-build
-
-      - name: Deploy netmaker containers
-        working-directory: deploy/netmaker
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.netmaker up -d
+      - name: Deploy zerotier controller
+        working-directory: deploy/zerotier-controller
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-controller up -d --build
 
       - name: Deploy bird-border containers
         working-directory: deploy/bird-border
         run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d
 
-      - name: Wait for netclient healthy and bird running
+      - name: Wait for zerotier healthy and bird running
         shell: bash
         run: |
           timeout=180
@@ -51,90 +43,25 @@ jobs:
           elapsed=0
 
           while [ $elapsed -lt $timeout ]; do
-            netclient_health="$(docker inspect -f '{{.State.Health.Status}}' netclient 2>/dev/null || true)"
+            zerotier_state="$(docker inspect -f '{{.State.Status}}' zerotier 2>/dev/null || true)"
             bird_state="$(docker inspect -f '{{.State.Status}}' bird-border 2>/dev/null || true)"
 
-            if [ "$netclient_health" = "healthy" ] && [ "$bird_state" = "running" ]; then
-              echo "netclient is healthy and bird-border is running."
+            if [ "$zerotier_state" = "running" ] && [ "$bird_state" = "running" ]; then
+              echo "zerotier is running and bird-border is running."
               exit 0
             fi
 
-            echo "Waiting... netclient=$netclient_health bird=$bird_state"
+            echo "Waiting... zerotier=$zerotier_state bird=$bird_state"
             sleep "$interval"
             elapsed=$((elapsed + interval))
           done
 
-          echo "Timeout waiting for healthy containers."
+          echo "Timeout waiting for running containers."
           docker ps -a
           exit 1
 
       - name: Show bird status
         run: docker exec bird-border birdc show status
-
-      - name: Load monitoring environment
-        run: |
-          cat /home/github-runner/configs/44mesh/.env.monitoring >> "$GITHUB_ENV"
-
-      - name: Deploy monitoring stack
-        working-directory: deploy/monitoring
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.monitoring up -d --build
-
-      - name: Update monitoring infrastructure configs
-        run: |
-          # Take ownership of monitoring dirs (allowed by sudoers: chown -R github-runner:github-runner /opt/*)
-          sudo chown -R github-runner:github-runner "${MONITORING_BASE_DIR}"
-
-          # Substitute placeholders in scrape config using envsubst (safe against special chars)
-          export VM_BRIDGE_GATEWAY GRAFANA_DATASOURCE_UID
-          envsubst '${VM_BRIDGE_GATEWAY}' \
-            < deploy/monitoring/vmconfig-scrape-additions.yml > /tmp/scrape-additions-resolved.yml
-
-          cp "${MONITORING_BASE_DIR}/vmconfig/scrape.yml" /tmp/scrape.yml.work
-          ADDITIONS=/tmp/scrape-additions-resolved.yml VM_CONFIG=/tmp/scrape.yml.work \
-            python3 deploy/monitoring/merge-scrape-config.py
-          mv /tmp/scrape.yml.work "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
-          sudo chmod 644 "${MONITORING_BASE_DIR}/vmconfig/scrape.yml"
-
-          # Substitute datasource UID in dashboard and alert files
-          envsubst '${GRAFANA_DATASOURCE_UID}' \
-            < deploy/monitoring/dashboards/44mesh-health.json > /tmp/44mesh-health.json
-          envsubst '${GRAFANA_DATASOURCE_UID}' \
-            < deploy/monitoring/alerting/44mesh-alerts.yml > /tmp/44mesh-alerts.yml
-
-          # Copy resolved Grafana dashboard
-          mkdir -p "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh"
-          cp /tmp/44mesh-health.json "${MONITORING_BASE_DIR}/grafana/dashboards/44mesh/"
-
-          # Copy resolved Grafana alerting rules
-          mkdir -p "${MONITORING_BASE_DIR}/grafana/provisioning/alerting"
-          cp /tmp/44mesh-alerts.yml "${MONITORING_BASE_DIR}/grafana/provisioning/alerting/"
-
-          # Add 44mesh dashboard provider (separate file, won't overwrite existing providers)
-          cp deploy/monitoring/grafana-dashboard-provider.yml \
-            "${MONITORING_BASE_DIR}/grafana/provisioning/dashboards/44mesh-provider.yml"
-
-          # Restore ownership to service:service
-          sudo chown -R service:service "${MONITORING_BASE_DIR}"
-
-          # Reload VictoriaMetrics scrape config (hot reload)
-          curl -sf -X POST "http://127.0.0.1:${VM_PORT}/-/reload"
-
-          # Restart Grafana to pick up new providers and alerting
-          docker restart "${GRAFANA_CONTAINER}"
-
-      - name: Verify monitoring
-        run: |
-          sleep 10
-          echo "--- Process Exporter ---"
-          curl -sf http://127.0.0.1:9256/metrics | grep -c namedprocess || echo "WARN: process-exporter not responding"
-          echo "--- Mesh Watchdog ---"
-          curl -sf "http://127.0.0.1:${WATCHDOG_PORT}/metrics" | grep -c mesh_ || echo "WARN: mesh-watchdog not responding"
-
-      - name: Cleanup temp files
-        if: always()
-        run: |
-          rm -f /tmp/scrape-additions-resolved.yml /tmp/scrape.yml.work
-          rm -f /tmp/44mesh-health.json /tmp/44mesh-alerts.yml
 
       - name: Write job summary
         run: |
@@ -142,9 +69,8 @@ jobs:
             echo "## Deployment Summary"
             echo ""
             echo "### Deployments"
-            echo "- ✅ Netmaker (netmaker, netmaker-ui, mq)"
-            echo "- ✅ Bird-border (netclient, bird)"
-            echo "- ✅ Monitoring (process-exporter, mesh-watchdog)"
+            echo "- ✅ ZeroTier Controller (zerotier-controller, ztncui)"
+            echo "- ✅ Bird-border (zerotier, bird)"
             echo ""
             echo "### Details"
             echo "- Event: ${{ github.event_name }}"

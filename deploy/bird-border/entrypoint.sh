@@ -7,12 +7,12 @@ echo "=== BIRD Border Router ==="
 echo "AS: ${BORDER_ROUTER_AS:-unknown}, Router ID: ${BORDER_ROUTER_IP:-unknown}"
 echo "Peering with ISP at ${ISP_IP:-unknown} (AS ${ISP_AS:-unknown})"
 
-# Find Netmaker WireGuard interface (nm-* or netmaker)
+# Find ZeroTier interface (zt*)
 find_interface() {
-    ip -o link show | awk -F': ' '{print $2}' | grep -E '^(nm-|netmaker)' | head -1
+    ip -o link show | awk -F': ' '{print $2}' | grep -E '^zt' | head -1
 }
 
-echo "Waiting for Netmaker WireGuard interface..."
+echo "Waiting for ZeroTier interface..."
 
 waited=0
 while true; do
@@ -21,7 +21,7 @@ while true; do
         break
     fi
     if [ $waited -ge $MAX_WAIT ]; then
-        echo "ERROR: No nm-* interface found after ${MAX_WAIT}s"
+        echo "ERROR: No zt* interface found after ${MAX_WAIT}s"
         ip link show
         exit 1
     fi

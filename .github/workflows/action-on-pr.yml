@@ -17,44 +17,43 @@ permissions:
   contents: read
 
 jobs:
-  validate-netmaker:
-    name: Validate Netmaker
+  validate-zerotier-controller:
+    name: Validate ZeroTier Controller
     runs-on: ubuntu-latest
-    environment: netmaker-action
+    environment: zerotier-action
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create netmaker .env file
-        working-directory: deploy/netmaker
+      - name: Create zerotier-controller .env file
+        working-directory: deploy/zerotier-controller
         run: |
-          cat > .env << 'EOF'
-          SERVER_HOST=netmaker.test.local
-          NETMAKER_API_PORT=8443
-          MQTT_PORT=1883
-          WIREGUARD_PORT=51821
-          MASTER_KEY=${{ secrets.MASTER_KEY }}
-          MESH_NETWORK_ID=mesh
-          MESH_ADDRESS_RANGE=44.30.127.0/24
-          EOF
+          cat > .env << 'ENV'
+          ZEROTIER_VERSION=1.16.0
+          ZTNCUI_HTTP_PORT=3000
+          ZTNCUI_HTTPS_PORT=3443
+          ZTNCUI_HTTP_ALL_INTERFACES=true
+          ZTNCUI_HTTPS_HOST=
+          ZTNCUI_PASSWD=test-password
+          ENV
 
       - name: Validate docker-compose configuration
-        working-directory: deploy/netmaker
+        working-directory: deploy/zerotier-controller
         run: |
-          echo "=== Validating netmaker docker-compose ==="
+          echo "=== Validating zerotier-controller docker-compose ==="
           docker compose config
           echo ""
           echo "=== Services found ==="
           docker compose config --services
           echo ""
-          echo "✓ Netmaker configuration validated successfully"
+          echo "✓ ZeroTier controller configuration validated successfully"
 
   validate-bird-border:
     name: Validate Bird-Border
     runs-on: ubuntu-latest
     environment: bird-border-action
-    needs: validate-netmaker
+    needs: validate-zerotier-controller
 
     steps:
       - name: Checkout repository
@@ -63,8 +62,9 @@ jobs:
       - name: Create bird-border .env file
         working-directory: deploy/bird-border
         run: |
-          cat > .env << 'EOF'
-          ENROLLMENT_TOKEN=${{ secrets.ENROLLMENT_TOKEN }}
+          cat > .env << 'ENV'
+          ZT_NETWORK_ID=0123456789abcdef
+          ZEROTIER_API_SECRET=
           BORDER_ROUTER_AS=65000
           BORDER_ROUTER_IP=172.30.0.100
           BORDER_ROUTER_INTERFACE=eth0
@@ -74,14 +74,7 @@ jobs:
           MESH_ADDRESS_RANGE=44.30.127.0/24
           BGP_HOLD_TIME=90
           BGP_KEEPALIVE_TIME=30
-          EOF
-
-      - name: Build patched netclient image
-        run: |
-          git clone --branch fix/dns-socket-leak --depth 1 \
-            https://github.com/AlterMundi/netclient.git /tmp/netclient-build
-          docker build -t altermundi/netclient:fix-dns-socket-leak /tmp/netclient-build
-          rm -rf /tmp/netclient-build
+          ENV
 
       - name: Validate docker-compose configuration
         working-directory: deploy/bird-border
@@ -109,56 +102,40 @@ jobs:
           echo ""
           echo "✓ Images verified"
 
-  validate-monitoring:
-    name: Validate Monitoring
+  validate-zerotier-client:
+    name: Validate ZeroTier Client
     runs-on: ubuntu-latest
-    needs: validate-netmaker
+    needs: validate-zerotier-controller
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create monitoring .env file
-        working-directory: deploy/monitoring
+      - name: Create zerotier client .env file
+        working-directory: deploy/zerotier
         run: |
-          cat > .env << 'EOF'
-          MONITORING_NETWORK=test-network
-          WATCHDOG_PORT=9257
-          LISTEN_ADDR=127.0.0.1
-          COLLECT_INTERVAL=15
-          NETMAKER_API_URL=http://127.0.0.1:8443
-          MQTT_HOST=127.0.0.1
-          MQTT_PORT=1883
-          DNS_TEST_DOMAIN=google.com
-          DNS_TEST_INTERNAL=netmaker.altermundi.net
-          EOF
-
-      - name: Create test Docker network
-        run: docker network create test-network
+          cat > .env << 'ENV'
+          ZT_NETWORK_ID=0123456789abcdef
+          ZEROTIER_API_SECRET=
+          ZEROTIER_IDENTITY_PUBLIC=
+          ZEROTIER_IDENTITY_SECRET=
+          ENV
 
       - name: Validate docker-compose configuration
-        working-directory: deploy/monitoring
+        working-directory: deploy/zerotier
         run: |
-          echo "=== Validating monitoring docker-compose ==="
+          echo "=== Validating zerotier docker-compose ==="
           docker compose config
           echo ""
           echo "=== Services found ==="
           docker compose config --services
           echo ""
-          echo "✓ Monitoring configuration validated successfully"
-
-      - name: Build monitoring containers
-        working-directory: deploy/monitoring
-        run: |
-          echo "=== Building mesh-watchdog image (--no-cache) ==="
-          docker compose build --no-cache
-          echo ""
-          echo "✓ Build completed successfully"
+          echo "✓ ZeroTier client configuration validated successfully"
 
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [validate-netmaker, validate-bird-border, validate-monitoring]
+    needs: [validate-zerotier-controller, validate-bird-border, validate-zerotier-client]
     if: always()
 
     steps:
@@ -170,9 +147,9 @@ jobs:
             echo "### Validation Results"
             echo "| Component | Status |"
             echo "|-----------|--------|"
-            echo "| Netmaker | ${{ needs.validate-netmaker.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| ZeroTier Controller | ${{ needs.validate-zerotier-controller.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo "| Bird-Border | ${{ needs.validate-bird-border.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
-            echo "| Monitoring | ${{ needs.validate-monitoring.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| ZeroTier Client | ${{ needs.validate-zerotier-client.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo ""
             echo "### Details"
             echo "- PR: #${{ github.event.pull_request.number }}"
@@ -181,7 +158,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check overall status
-        if: needs.validate-netmaker.result != 'success' || needs.validate-bird-border.result != 'success' || needs.validate-monitoring.result != 'success'
+        if: needs.validate-zerotier-controller.result != 'success' || needs.validate-bird-border.result != 'success' || needs.validate-zerotier-client.result != 'success'
         run: |
           echo "One or more validations failed"
           exit 1
