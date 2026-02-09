@@ -206,6 +206,42 @@ See [deploy/rpi-isp/README.md](deploy/rpi-isp/README.md) for full mock ISP setup
                                        └─────────────────┘
 ```
 
+## Verification
+
+### BGP Session
+```bash
+docker exec bird-border birdc show protocols
+docker exec bird-border birdc show route
+```
+
+### Mesh Connectivity
+```bash
+docker exec zerotier zerotier-cli info
+docker exec zerotier zerotier-cli listnetworks
+ping <mesh-node-ip>  # other mesh nodes in ${MESH_ADDRESS_RANGE}
+```
+
+### End-to-End (from mock ISP)
+```bash
+# From RPi, should reach any mesh node
+ping <mesh-node-ip>  # any IP in ${MESH_ADDRESS_RANGE}
+```
+
+## Security Notes
+
+- ZeroTier containers run with `NET_ADMIN` + `SYS_ADMIN` capabilities. `SYS_ADMIN` is
+  required for ZeroTier's network namespace and tun/tap device management inside Docker.
+  Both capabilities are scoped to the container and do not grant host-level root access.
+- Use proper TLS termination (reverse proxy) in front of ztncui for production.
+- `ZTNCUI_PASSWD` is stored in plaintext in `.env` files — protect file permissions.
+- Configure host firewall to restrict access to ztncui ports.
+
 ## References
 
-- ZeroTier Documentation
+- [ZeroTier Documentation](https://docs.zerotier.com/)
+- [BIRD Internet Routing Daemon](https://bird.network.cz/)
+- [BGP RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)
+
+## License
+
+MIT

@@ -43,15 +43,15 @@ jobs:
           elapsed=0
 
           while [ $elapsed -lt $timeout ]; do
-            zerotier_state="$(docker inspect -f '{{.State.Status}}' zerotier 2>/dev/null || true)"
+            zerotier_health="$(docker inspect -f '{{.State.Health.Status}}' zerotier 2>/dev/null || true)"
             bird_state="$(docker inspect -f '{{.State.Status}}' bird-border 2>/dev/null || true)"
 
-            if [ "$zerotier_state" = "running" ] && [ "$bird_state" = "running" ]; then
-              echo "zerotier is running and bird-border is running."
+            if [ "$zerotier_health" = "healthy" ] && [ "$bird_state" = "running" ]; then
+              echo "zerotier is healthy and bird-border is running."
               exit 0
             fi
 
-            echo "Waiting... zerotier=$zerotier_state bird=$bird_state"
+            echo "Waiting... zerotier=$zerotier_health bird=$bird_state"
             sleep "$interval"
             elapsed=$((elapsed + interval))
           done

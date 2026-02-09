@@ -20,7 +20,7 @@ docker compose up -d --build
 ## Access UI
 
 By default, ztncui listens on:
-- HTTP: `http://<host>:3000`
+- HTTP: `http://<host>:3180`
 - HTTPS: `https://<host>:3443`
 
 Login with the password set in `ZTNCUI_PASSWD`.

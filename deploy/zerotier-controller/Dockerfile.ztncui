@@ -1,14 +1,18 @@
-FROM node:14-bullseye
+FROM node:18-bookworm
 
 RUN apt-get update && apt-get install -y \
     git \
     python3 \
     make \
     g++ \
+    curl \
   && rm -rf /var/lib/apt/lists/*
 
+# Pin to last upstream commit (2023-08-31) — project is unmaintained
 WORKDIR /opt/key-networks
-RUN git clone --depth 1 https://github.com/key-networks/ztncui /opt/key-networks/ztncui
+RUN git clone https://github.com/key-networks/ztncui /opt/key-networks/ztncui \
+  && cd /opt/key-networks/ztncui \
+  && git checkout 1b2284864de48d2dcae22582fff122fe24909c3d
 
 WORKDIR /opt/key-networks/ztncui/src
 RUN npm install
@@ -21,13 +25,13 @@ RUN chmod +x /usr/local/bin/ztncui-entrypoint.sh
 
 ENV NODE_ENV=production
 ENV ZT_ADDR=127.0.0.1:9993
-ENV ZTNCUI_HTTP_PORT=3000
+ENV ZTNCUI_HTTP_PORT=3180
 ENV ZTNCUI_HTTPS_PORT=3443
 ENV ZTNCUI_HTTP_ALL_INTERFACES=
 ENV ZTNCUI_HTTPS_HOST=
-ENV ZTNCUI_PASSWD=password
+ENV ZTNCUI_PASSWD=
 
-EXPOSE 3000
+EXPOSE 3180
 EXPOSE 3443
 
 ENTRYPOINT ["/usr/local/bin/ztncui-entrypoint.sh"]

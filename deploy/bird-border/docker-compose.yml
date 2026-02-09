@@ -7,11 +7,11 @@
 
 services:
   zerotier:
-    image: zerotier/zerotier:latest
+    image: zerotier/zerotier:1.14.2
     container_name: zerotier
     cap_add:
       - NET_ADMIN
-      - SYS_ADMIN
+      - SYS_ADMIN  # required for tun/tap and network namespace management in Docker
     network_mode: host
     devices:
       - /dev/net/tun:/dev/net/tun
@@ -21,7 +21,7 @@ services:
       ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
     command: ["${ZT_NETWORK_ID}"]
     healthcheck:
-      test: ["CMD-SHELL", "ip link show | grep -q '^zt'"]
+      test: ["CMD-SHELL", "zerotier-cli listnetworks | grep -q OK"]
       interval: 10s
       timeout: 5s
       retries: 30
