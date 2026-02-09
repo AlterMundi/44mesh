@@ -16,7 +16,9 @@ docker compose up -d
 
 In ztncui:
 1. Approve the member.
-2. Enable **Allow Global** for the member so it can accept public IPs/routes.
+2. Enable **Allow Global** for the member. This is required because the mesh uses public
+   IPs from `${MESH_ADDRESS_RANGE}` — without Allow Global, ZeroTier only accepts
+   private RFC1918 addresses on the interface.
 
 ## Verify
 

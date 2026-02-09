@@ -14,7 +14,7 @@ if [ -z "${ZT_TOKEN:-}" ]; then
 fi
 
 : "${ZT_ADDR:=127.0.0.1:9993}"
-: "${ZTNCUI_HTTP_PORT:=3000}"
+: "${ZTNCUI_HTTP_PORT:=3180}"
 : "${ZTNCUI_HTTPS_PORT:=3443}"
 : "${ZTNCUI_HTTP_ALL_INTERFACES:=}"
 : "${ZTNCUI_HTTPS_HOST:=}"
