@@ -1,27 +1,4 @@
 services:
-  zerotier-controller:
-    build:
-      context: .
-      dockerfile: Dockerfile.controller
-      args:
-        ZEROTIER_VERSION: ${ZEROTIER_VERSION:-1.16.0}
-    container_name: zerotier-controller
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN  # required for tun/tap and network namespace management in Docker
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    volumes:
-      - zerotier_data:/var/lib/zerotier-one
-    healthcheck:
-      test: ["CMD-SHELL", "zerotier-cli info | grep -q ONLINE"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 15s
-    restart: unless-stopped
-
   ztncui:
     build:
       context: .
@@ -36,11 +13,7 @@ services:
       ZTNCUI_HTTPS_HOST: "${ZTNCUI_HTTPS_HOST}"
       ZTNCUI_PASSWD: "${ZTNCUI_PASSWD}"
     volumes:
-      - zerotier_data:/var/lib/zerotier-one:ro
-      - ztncui_data:/opt/key-networks/ztncui/etc
-    depends_on:
-      zerotier-controller:
-        condition: service_healthy
+      - bird-border_zerotier_data:/var/lib/zerotier-one:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:${ZTNCUI_HTTP_PORT:-3180}/ || exit 1"]
       interval: 15s
@@ -50,5 +23,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  zerotier_data:
-  ztncui_data:
+  bird-border_zerotier_data:
+    external: true

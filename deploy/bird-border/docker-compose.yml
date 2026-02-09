@@ -2,12 +2,16 @@
 # BGP peering with ISP + ZeroTier mesh connectivity
 #
 # Components:
-#   - zerotier: mesh client (joins ZeroTier network)
+#   - zerotier: controller + mesh client (built with ZT_NONFREE=1)
 #   - bird: BGP daemon (peers with RPi ISP at 172.30.0.1)
 
 services:
   zerotier:
-    image: zerotier/zerotier:1.14.2
+    build:
+      context: ../zerotier-controller
+      dockerfile: Dockerfile.controller
+      args:
+        ZEROTIER_VERSION: ${ZEROTIER_VERSION:-1.16.0}
     container_name: zerotier
     cap_add:
       - NET_ADMIN
@@ -17,8 +21,6 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - zerotier_data:/var/lib/zerotier-one
-    environment:
-      ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
     command: ["${ZT_NETWORK_ID}"]
     healthcheck:
       test: ["CMD-SHELL", "zerotier-cli listnetworks | grep -q OK"]

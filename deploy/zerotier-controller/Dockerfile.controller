@@ -29,11 +29,12 @@ RUN apt-get update && apt-get install -y \
 COPY --from=build /src/zerotier-one /usr/local/sbin/zerotier-one
 COPY --from=build /src/zerotier-cli /usr/local/bin/zerotier-cli
 COPY --from=build /src/zerotier-idtool /usr/local/bin/zerotier-idtool
+COPY controller-entrypoint.sh /usr/local/bin/controller-entrypoint.sh
+RUN chmod +x /usr/local/bin/controller-entrypoint.sh
 
 VOLUME /var/lib/zerotier-one
 
 EXPOSE 9993/udp
 EXPOSE 9993/tcp
 
-ENTRYPOINT ["/usr/local/sbin/zerotier-one"]
-CMD ["-U", "/var/lib/zerotier-one"]
+ENTRYPOINT ["/usr/local/bin/controller-entrypoint.sh"]

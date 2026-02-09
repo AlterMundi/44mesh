@@ -28,18 +28,14 @@ jobs:
           echo "Git SHA: $(git rev-parse HEAD)"
           echo "Expected SHA: ${{ github.sha }}"
 
-      - name: Deploy zerotier controller
-        working-directory: deploy/zerotier-controller
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-controller up -d --build
-
-      - name: Deploy bird-border containers
+      - name: Deploy bird-border (zerotier + bird)
         working-directory: deploy/bird-border
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d --build
 
       - name: Wait for zerotier healthy and bird running
         shell: bash
         run: |
-          timeout=180
+          timeout=300
           interval=5
           elapsed=0
 
@@ -59,7 +55,12 @@ jobs:
 
           echo "Timeout waiting for running containers."
           docker ps -a
+          docker logs zerotier 2>&1 | tail -20
           exit 1
+
+      - name: Deploy ztncui (web UI)
+        working-directory: deploy/zerotier-controller
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-controller up -d --build
 
       - name: Show bird status
         run: docker exec bird-border birdc show status
@@ -70,8 +71,8 @@ jobs:
             echo "## Deployment Summary"
             echo ""
             echo "### Deployments"
-            echo "- ✅ ZeroTier Controller (zerotier-controller, ztncui)"
-            echo "- ✅ Bird-border (zerotier, bird)"
+            echo "- ✅ Bird-border (zerotier controller + bird)"
+            echo "- ✅ ztncui (ZeroTier web UI)"
             echo ""
             echo "### Details"
             echo "- Event: ${{ github.event_name }}"
