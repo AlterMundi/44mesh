@@ -17,7 +17,7 @@ RUN git clone https://github.com/key-networks/ztncui /opt/key-networks/ztncui \
 WORKDIR /opt/key-networks/ztncui/src
 RUN npm install
 
-WORKDIR /opt/key-networks/ztncui
+WORKDIR /opt/key-networks/ztncui/src
 RUN cp -v etc/default.passwd etc/passwd
 
 COPY ztncui-entrypoint.sh /usr/local/bin/ztncui-entrypoint.sh
