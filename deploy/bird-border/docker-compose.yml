@@ -23,7 +23,7 @@ services:
       - zerotier_data:/var/lib/zerotier-one
     command: ["${ZT_NETWORK_ID}"]
     healthcheck:
-      test: ["CMD-SHELL", "zerotier-cli listnetworks | grep -q OK"]
+      test: ["CMD-SHELL", "zerotier-cli info | grep -q ONLINE"]
       interval: 10s
       timeout: 5s
       retries: 30

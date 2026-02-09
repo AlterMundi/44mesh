@@ -12,10 +12,12 @@ while ! /usr/local/bin/zerotier-cli info 2>/dev/null | grep -q ONLINE; do
 done
 echo "ZeroTier is ONLINE: $(/usr/local/bin/zerotier-cli info)"
 
-# Join any networks passed as arguments
+# Join any networks passed as arguments (skip empty strings)
 for network in "$@"; do
-  echo "Joining network: $network"
-  /usr/local/bin/zerotier-cli join "$network"
+  if [ -n "$network" ]; then
+    echo "Joining network: $network"
+    /usr/local/bin/zerotier-cli join "$network"
+  fi
 done
 
 # Wait for zerotier-one process
