@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 ARG ZEROTIER_VERSION=1.16.0
 
 WORKDIR /src
-RUN git clone --branch "v${ZEROTIER_VERSION}" --depth 1 https://github.com/zerotier/ZeroTierOne.git .
+RUN git clone --branch "${ZEROTIER_VERSION}" --depth 1 https://github.com/zerotier/ZeroTierOne.git .
 
 RUN make -j"$(nproc)" ZT_NONFREE=1
 
