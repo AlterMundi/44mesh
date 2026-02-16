@@ -10,6 +10,7 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - zerotier_data:/var/lib/zerotier-one
+      - ./local.conf:/var/lib/zerotier-one/local.conf:ro
     environment:
       ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
       ZEROTIER_IDENTITY_PUBLIC: "${ZEROTIER_IDENTITY_PUBLIC}"
