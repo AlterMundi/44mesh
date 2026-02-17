@@ -1,6 +1,7 @@
 services:
   zerotier:
-    image: zerotier/zerotier:1.14.2
+    build: .
+    # image: zerotier/zerotier:1.14.2
     container_name: zerotier
     network_mode: host
     cap_add:
