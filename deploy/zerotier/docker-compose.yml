@@ -11,10 +11,13 @@ services:
     volumes:
       - zerotier_data:/var/lib/zerotier-one
       - ./local.conf:/var/lib/zerotier-one/local.conf:ro
+      - ./network.local.conf:/tmp/network.local.conf:ro
+      - ./entrypoint.sh:/entrypoint.sh:ro
     environment:
       ZEROTIER_API_SECRET: "${ZEROTIER_API_SECRET}"
       ZEROTIER_IDENTITY_PUBLIC: "${ZEROTIER_IDENTITY_PUBLIC}"
       ZEROTIER_IDENTITY_SECRET: "${ZEROTIER_IDENTITY_SECRET}"
+    entrypoint: /entrypoint.sh
     command: ["${ZT_NETWORK_ID}"]
     healthcheck:
       test: ["CMD-SHELL", "zerotier-cli listnetworks | grep -q OK"]
