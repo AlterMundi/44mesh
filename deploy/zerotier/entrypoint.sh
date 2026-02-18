@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/bash
 set -Eeo pipefail
 
 if [ ! -e /dev/net/tun ]; then
@@ -30,4 +30,4 @@ if [ -n "$NETWORK_ID" ] && [ -f /tmp/network.local.conf ]; then
     cp /tmp/network.local.conf "/var/lib/zerotier-one/networks.d/${NETWORK_ID}.local.conf"
 fi
 
-exec zerotier-one "$@"
+exec zerotier-one -U /var/lib/zerotier-one
