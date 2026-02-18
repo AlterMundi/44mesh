@@ -13,10 +13,11 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-ARG ZEROTIER_VERSION=1.16.0
+ARG ZEROTIER_REPO=https://github.com/AlterMundi/ZeroTierOne.git
+ARG ZEROTIER_BRANCH=feature/ingress-node
 
 WORKDIR /src
-RUN git clone --branch "${ZEROTIER_VERSION}" --depth 1 https://github.com/zerotier/ZeroTierOne.git .
+RUN git clone --branch "${ZEROTIER_BRANCH}" --depth 1 "${ZEROTIER_REPO}" .
 
 RUN make -j"$(nproc)" ZT_NONFREE=1
 

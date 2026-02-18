@@ -11,7 +11,8 @@ services:
       context: ../zerotier-controller
       dockerfile: Dockerfile.controller
       args:
-        ZEROTIER_VERSION: ${ZEROTIER_VERSION:-1.16.0}
+        ZEROTIER_REPO: ${ZEROTIER_REPO:-https://github.com/AlterMundi/ZeroTierOne.git}
+        ZEROTIER_BRANCH: ${ZEROTIER_BRANCH:-feature/ingress-node}
     container_name: zerotier
     cap_add:
       - NET_ADMIN
