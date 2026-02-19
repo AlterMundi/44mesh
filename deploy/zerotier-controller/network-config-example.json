@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "Example network config for a 44mesh ingress network.",
+    "Apply via controller API after the controller has joined the network and received its ZT IP:",
+    "",
+    "  TOKEN=$(cat /var/lib/zerotier-one/authtoken.secret)",
+    "  NWID=<your-network-id>",
+    "  ZT_IP=$(zerotier-cli get $NWID ip | head -1 | cut -d/ -f1)",
+    "  curl -X POST -H \"X-ZT1-AUTH: $TOKEN\" \\",
+    "       -H 'Content-Type: application/json' \\",
+    "       -d @network-config-example.json \\",
+    "       http://localhost:9993/controller/network/$NWID",
+    "",
+    "Replace 138.255.89 with your actual public /24 block.",
+    "Set ingressNodeV4 to the ZT IP the controller received on this network (e.g. 138.255.89.1).",
+    "Remove this _comment key before posting — it is only for human reference."
+  ],
+
+  "name": "any89",
+
+  "private": true,
+  "enableBroadcast": true,
+  "mtu": 2800,
+  "multicastLimit": 32,
+
+  "ipAssignmentPools": [
+    {
+      "ipRangeStart": "138.255.89.1",
+      "ipRangeEnd":   "138.255.89.254"
+    }
+  ],
+
+  "routes": [
+    { "target": "138.255.89.0/24", "via": null }
+  ],
+
+  "v4AssignMode": { "zt": true },
+  "v6AssignMode": { "6plane": false, "rfc4193": false, "zt": false },
+
+  "dns": {
+    "domain": "zerotier.altermundi.net",
+    "servers": []
+  },
+
+  "rules": [
+    { "type": "ACTION_ACCEPT", "not": false, "or": false }
+  ],
+
+  "ingressNodeV4": "138.255.89.1"
+}
