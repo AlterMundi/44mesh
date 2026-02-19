@@ -294,7 +294,7 @@ jobs:
     name: Sync Docker Hub descriptions
     runs-on: ubuntu-latest
     needs: changes
-    if: github.event_name == 'push'
+    if: false  # disabled: PAT tokens don't have Hub API access for description updates
     strategy:
       fail-fast: false
       matrix:
