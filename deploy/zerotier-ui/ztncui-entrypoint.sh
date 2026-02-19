@@ -2,7 +2,7 @@
 set -eu
 
 ZT_TOKEN_FILE="/var/lib/zerotier-one/authtoken.secret"
-ENV_FILE="/opt/key-networks/ztncui/src/.env"
+ENV_FILE="/opt/altermundi/zerotier-ui/src/.env"
 
 if [ -z "${ZT_TOKEN:-}" ]; then
     if [ -f "$ZT_TOKEN_FILE" ]; then
@@ -34,5 +34,5 @@ fi
 
 chmod 600 "$ENV_FILE"
 
-cd /opt/key-networks/ztncui/src
+cd /opt/altermundi/zerotier-ui/src
 exec npm start
