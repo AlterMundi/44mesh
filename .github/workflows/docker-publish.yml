@@ -1,0 +1,338 @@
+name: Docker Publish
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/docker-publish.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/docker-publish.yml"
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Which image to build"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - zerotier
+          - rpi-isp
+          - bird-border
+          - zerotier-ui
+      force:
+        description: "Force run (ignore path filters)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: docker.io
+  ORG: buzondefede
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      zerotier: ${{ steps.filter.outputs.zerotier }}
+      rpi_isp: ${{ steps.filter.outputs.rpi_isp }}
+      bird_border: ${{ steps.filter.outputs.bird_border }}
+      zerotier_ui: ${{ steps.filter.outputs.zerotier_ui }}
+      readme_zerotier: ${{ steps.filter.outputs.readme_zerotier }}
+      readme_rpi_isp: ${{ steps.filter.outputs.readme_rpi_isp }}
+      readme_bird_border: ${{ steps.filter.outputs.readme_bird_border }}
+      readme_zerotier_ui: ${{ steps.filter.outputs.readme_zerotier_ui }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            zerotier:
+              - 'deploy/zerotier/**'
+            rpi_isp:
+              - 'deploy/rpi-isp/**'
+            bird_border:
+              - 'deploy/bird-border/**'
+            zerotier_ui:
+              - 'deploy/zerotier-ui/**'
+            readme_zerotier:
+              - 'deploy/zerotier/README.dockerhub.md'
+            readme_rpi_isp:
+              - 'deploy/rpi-isp/README.dockerhub.md'
+            readme_bird_border:
+              - 'deploy/bird-border/README.dockerhub.md'
+            readme_zerotier_ui:
+              - 'deploy/zerotier-ui/README.dockerhub.md'
+
+  zerotier:
+    name: Build/push 44mesh-zerotier
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'zerotier')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.zerotier == 'true' || github.event.inputs.force == 'true')) ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.zerotier == 'true')
+    env:
+      IMAGE: 44mesh-zerotier
+      ZEROTIER_BRANCH: feature/ingress-node
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker Hub login
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        name: Docker meta (tags/labels)
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/zerotier
+          file: deploy/zerotier/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            ZEROTIER_BRANCH=${{ env.ZEROTIER_BRANCH }}
+          cache-from: type=gha,scope=zerotier
+          cache-to: type=gha,mode=max,scope=zerotier
+      - name: Summary
+        run: |
+          {
+            echo "### Built buzondefede/${IMAGE}";
+            echo "- Platforms: linux/amd64, linux/arm64";
+            echo "- Tags:";
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- /';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rpi-isp:
+    name: Build/push 44mesh-rpi-isp
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'rpi-isp')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.rpi_isp == 'true' || github.event.inputs.force == 'true')) ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.rpi_isp == 'true')
+    env:
+      IMAGE: 44mesh-rpi-isp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - uses: docker/setup-buildx-action@v3
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/rpi-isp
+          file: deploy/rpi-isp/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=rpi-isp
+          cache-to: type=gha,mode=max,scope=rpi-isp
+      - name: Summary
+        run: |
+          {
+            echo "### Built buzondefede/${IMAGE}";
+            echo "- Platforms: linux/amd64, linux/arm64, linux/arm/v7";
+            echo "- Tags:";
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- /';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  bird-border:
+    name: Build/push 44mesh-bird-border
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'bird-border')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.bird_border == 'true' || github.event.inputs.force == 'true')) ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.bird_border == 'true')
+    env:
+      IMAGE: 44mesh-bird-border
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - uses: docker/setup-buildx-action@v3
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/bird-border
+          file: deploy/bird-border/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=bird-border
+          cache-to: type=gha,mode=max,scope=bird-border
+      - name: Summary
+        run: |
+          {
+            echo "### Built buzondefede/${IMAGE}";
+            echo "- Platforms: linux/amd64, linux/arm64";
+            echo "- Tags:";
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- /';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  zerotier-ui:
+    name: Build/push 44mesh-zerotier-ui
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'zerotier-ui')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.zerotier_ui == 'true' || github.event.inputs.force == 'true')) ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.zerotier_ui == 'true')
+    env:
+      IMAGE: 44mesh-zerotier-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - uses: docker/setup-buildx-action@v3
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern=v{{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/zerotier-ui
+          file: deploy/zerotier-ui/Dockerfile.ztncui
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=zerotier-ui
+          cache-to: type=gha,mode=max,scope=zerotier-ui
+      - name: Summary
+        run: |
+          {
+            echo "### Built buzondefede/${IMAGE}";
+            echo "- Platforms: linux/amd64, linux/arm64";
+            echo "- Tags:";
+            echo "${{ steps.meta.outputs.tags }}" | sed 's/^/- /';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dockerhub-readme:
+    name: Sync Docker Hub descriptions
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: zerotier
+            repo: buzondefede/44mesh-zerotier
+            readme: deploy/zerotier/README.dockerhub.md
+            short: "ZeroTier (AlterMundi fork) for 44mesh ingress nodes."
+          - id: rpi-isp
+            repo: buzondefede/44mesh-rpi-isp
+            readme: deploy/rpi-isp/README.dockerhub.md
+            short: "BIRD2 BGP router for Raspberry Pi (44mesh ISP)."
+          - id: bird-border
+            repo: buzondefede/44mesh-bird-border
+            readme: deploy/bird-border/README.dockerhub.md
+            short: "BIRD2 border router for 44mesh networks."
+          - id: zerotier-ui
+            repo: buzondefede/44mesh-zerotier-ui
+            readme: deploy/zerotier-ui/README.dockerhub.md
+            short: "ztncui-based ZeroTier controller UI (44mesh fork)."
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker Hub login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Update description
+        if: |
+          startsWith(github.ref, 'refs/tags/v') ||
+          (matrix.id == 'zerotier' && needs.changes.outputs.readme_zerotier == 'true') ||
+          (matrix.id == 'rpi-isp' && needs.changes.outputs.readme_rpi_isp == 'true') ||
+          (matrix.id == 'bird-border' && needs.changes.outputs.readme_bird_border == 'true') ||
+          (matrix.id == 'zerotier-ui' && needs.changes.outputs.readme_zerotier_ui == 'true')
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ matrix.repo }}
+          short-description: ${{ matrix.short }}
+          readme-filepath: ${{ matrix.readme }}
