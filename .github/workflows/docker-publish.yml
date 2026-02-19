@@ -90,6 +90,7 @@ jobs:
       (github.event_name == 'pull_request' && needs.changes.outputs.zerotier == 'true')
     env:
       IMAGE: 44mesh-zerotier
+      ZEROTIER_REPO: https://github.com/AlterMundi/ZeroTierOne.git
       ZEROTIER_BRANCH: feature/ingress-node
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +126,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            ZEROTIER_REPO=${{ env.ZEROTIER_REPO }}
             ZEROTIER_BRANCH=${{ env.ZEROTIER_BRANCH }}
           cache-from: type=gha,scope=zerotier
           cache-to: type=gha,mode=max,scope=zerotier

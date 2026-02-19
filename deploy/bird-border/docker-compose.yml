@@ -7,12 +7,7 @@
 
 services:
   zerotier:
-    build:
-      context: .
-      dockerfile: Dockerfile.controller
-      args:
-        ZEROTIER_REPO: ${ZEROTIER_REPO:-https://github.com/AlterMundi/ZeroTierOne.git}
-        ZEROTIER_BRANCH: ${ZEROTIER_BRANCH:-feature/ingress-node}
+    image: buzondefede/44mesh-zerotier:latest
     container_name: zerotier
     cap_add:
       - NET_ADMIN
