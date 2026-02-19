@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # AlterMundi fork with full network field edit UI
 WORKDIR /opt/altermundi
-RUN git clone --branch v0.0.6-altermundi https://github.com/altermundi/zerotier-ui /opt/altermundi/zerotier-ui
+RUN git clone --branch v0.0.9-altermundi https://github.com/altermundi/zerotier-ui /opt/altermundi/zerotier-ui
 
 WORKDIR /opt/altermundi/zerotier-ui/src
 RUN npm install
