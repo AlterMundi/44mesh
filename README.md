@@ -79,7 +79,7 @@ See [docs/ZEROTIER.md](docs/ZEROTIER.md) for a full explanation of the ingress r
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `deploy/bird-border/` | Public server | ZeroTier controller + BGP (BIRD) — the border router |
-| `deploy/zerotier-controller/` | Same server | ztncui web UI for member management |
+| `deploy/zerotier-ui/` | Same server | ZeroTier web UI for member management |
 | `deploy/zerotier/` | Any location | Mesh node (client) |
 
 ### Border Router + Controller (`deploy/bird-border/`)
@@ -89,13 +89,15 @@ The central component. Runs the ZeroTier controller and BGP daemon on the same h
 - **BIRD**: BGP daemon, announces your IP block to the ISP
 - **Ingress node**: forwards public IP traffic from the internet to mesh nodes via source-based policy routing
 
-### ztncui Web UI (`deploy/zerotier-controller/`)
+### ZeroTier Web UI (`deploy/zerotier-ui/`)
 
-Web interface for authorizing members and inspecting network state. Reads the
-controller auth token from the shared `zerotier_data` volume.
+Web interface for authorizing members and inspecting network state. Built from
+the [altermundi/zerotier-ui](https://github.com/altermundi/zerotier-ui) fork, which
+adds `ingressNodeV4` configuration support. Reads the controller auth token from
+the shared `zerotier_data` volume.
 
 > **Note:** The ZeroTier controller itself runs inside `deploy/bird-border/`, not here.
-> This stack only provides the ztncui UI.
+> This stack only provides the web UI.
 
 ### Mesh Nodes (`deploy/zerotier/`)
 
@@ -133,7 +135,7 @@ Before deploying, copy and customize environment files:
 cp .env.example .env
 
 # Component-specific configuration
-cp deploy/zerotier-controller/.env.example deploy/zerotier-controller/.env
+cp deploy/zerotier-ui/.env.example deploy/zerotier-ui/.env
 cp deploy/bird-border/.env.example deploy/bird-border/.env
 cp deploy/zerotier/.env.example deploy/zerotier/.env
 cp deploy/rpi-isp/.env.example deploy/rpi-isp/.env  # if using mock ISP
@@ -159,17 +161,17 @@ Use the ZeroTier controller API to create the network and configure `ingressNode
 
 See **[docs/ZEROTIER.md](docs/ZEROTIER.md)** for the full step-by-step procedure.
 
-### 3. Deploy ztncui Web UI (optional)
+### 3. Deploy ZeroTier Web UI (optional)
 
 ```bash
-cd deploy/zerotier-controller
+cd deploy/zerotier-ui
 cp .env.example .env
 # Edit .env with your UI password and ports
 
 docker compose up -d --build
 ```
 
-See [deploy/zerotier-controller/README.md](deploy/zerotier-controller/README.md) for details.
+See [deploy/zerotier-ui/README.md](deploy/zerotier-ui/README.md) for details.
 
 ### 4. Deploy Mesh Nodes
 
@@ -236,9 +238,9 @@ ping <mesh-node-ip>  # any IP in ${MESH_ADDRESS_RANGE}
 - ZeroTier containers run with `NET_ADMIN` + `SYS_ADMIN` capabilities. `SYS_ADMIN` is
   required for ZeroTier's network namespace and tun/tap device management inside Docker.
   Both capabilities are scoped to the container and do not grant host-level root access.
-- Use proper TLS termination (reverse proxy) in front of ztncui for production.
+- Use proper TLS termination (reverse proxy) in front of the web UI for production.
 - `ZTNCUI_PASSWD` is stored in plaintext in `.env` files — protect file permissions.
-- Configure host firewall to restrict access to ztncui ports.
+- Configure host firewall to restrict access to zerotier-ui ports.
 
 ## References
 

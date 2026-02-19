@@ -49,7 +49,7 @@ the border router to the ISP — fully transparent to the internet.
 | ZeroTier controller | `deploy/bird-border/` | Manages network membership, distributes config |
 | BIRD | `deploy/bird-border/` | BGP daemon, announces mesh prefix to ISP |
 | ZeroTier client | `deploy/zerotier/` | Mesh node, receives public IP, sets up ingress routing |
-| ztncui | `deploy/zerotier-controller/` | Web UI for controller (member management) |
+| zerotier-ui | `deploy/zerotier-ui/` | Web UI for controller (member management, ingressNodeV4 config) |
 
 All ZeroTier binaries are built from the
 [AlterMundi/ZeroTierOne](https://github.com/AlterMundi/ZeroTierOne) fork
@@ -138,10 +138,12 @@ docker exec zerotier zerotier-cli listnetworks
 
 ### Step 3 — Apply full network configuration
 
-Edit `deploy/zerotier-controller/network-config-example.json`: replace
+Edit `deploy/zerotier-ui/network-config-example.json`: replace
 `138.255.89` with your actual public `/24` block, update `name` and `dns.domain`
 as needed, and set `ingressNodeV4` to the ZT IP the controller received
-(e.g. `138.255.89.1`).
+(e.g. `138.255.89.1`). Alternatively, use the web UI at port 3180 — the
+**Ingress Node** button on each network's detail page lets you set `ingressNodeV4`
+directly without editing JSON.
 
 ```bash
 ZT_IP=$(docker exec zerotier zerotier-cli get $NWID ip 2>/dev/null | head -1 | cut -d/ -f1)
@@ -151,7 +153,7 @@ echo "Controller ZT IP: $ZT_IP  → set as ingressNodeV4"
 curl -s -X POST \
   -H "X-ZT1-AUTH: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "$(cat deploy/zerotier-controller/network-config-example.json | python3 -c \
+  -d "$(cat deploy/zerotier-ui/network-config-example.json | python3 -c \
     'import sys,json; d=json.load(sys.stdin); d.pop("_comment",None); print(json.dumps(d))')" \
   http://localhost:9993/controller/network/$NWID | python3 -m json.tool
 ```
@@ -176,7 +178,7 @@ ZT_NETWORK_ID=<your-network-id>
 ## Authorizing a New Node
 
 When a new node joins, it appears in the controller as unauthorized. Authorize
-it via the API or ztncui, and enable **Allow Global** so the node accepts
+it via the web UI (`deploy/zerotier-ui/`) or API, and enable **Allow Global** so the node accepts
 the public IP range:
 
 ```bash

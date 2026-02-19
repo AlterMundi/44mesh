@@ -1,9 +1,9 @@
 services:
-  ztncui:
+  zerotier-ui:
     build:
       context: .
       dockerfile: Dockerfile.ztncui
-    container_name: ztncui
+    container_name: zerotier-ui
     network_mode: host
     environment:
       ZT_ADDR: "127.0.0.1:9993"

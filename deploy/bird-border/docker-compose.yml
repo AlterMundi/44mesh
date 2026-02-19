@@ -8,7 +8,7 @@
 services:
   zerotier:
     build:
-      context: ../zerotier-controller
+      context: .
       dockerfile: Dockerfile.controller
       args:
         ZEROTIER_REPO: ${ZEROTIER_REPO:-https://github.com/AlterMundi/ZeroTierOne.git}

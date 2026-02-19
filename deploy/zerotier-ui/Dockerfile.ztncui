@@ -8,16 +8,14 @@ RUN apt-get update && apt-get install -y \
     curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Pin to last upstream commit (2023-08-31) — project is unmaintained
-WORKDIR /opt/key-networks
-RUN git clone https://github.com/key-networks/ztncui /opt/key-networks/ztncui \
-  && cd /opt/key-networks/ztncui \
-  && git checkout 1b2284864de48d2dcae22582fff122fe24909c3d
+# AlterMundi fork with ingressNodeV4 UI support
+WORKDIR /opt/altermundi
+RUN git clone --branch ingress-node-ui https://github.com/altermundi/zerotier-ui /opt/altermundi/zerotier-ui
 
-WORKDIR /opt/key-networks/ztncui/src
+WORKDIR /opt/altermundi/zerotier-ui/src
 RUN npm install
 
-WORKDIR /opt/key-networks/ztncui/src
+WORKDIR /opt/altermundi/zerotier-ui/src
 RUN cp -v etc/default.passwd etc/passwd
 
 COPY ztncui-entrypoint.sh /usr/local/bin/ztncui-entrypoint.sh

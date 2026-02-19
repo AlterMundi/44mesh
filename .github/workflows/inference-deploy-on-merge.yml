@@ -58,9 +58,9 @@ jobs:
           docker logs zerotier 2>&1 | tail -20
           exit 1
 
-      - name: Deploy ztncui (web UI)
-        working-directory: deploy/zerotier-controller
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-controller up -d --build
+      - name: Deploy zerotier-ui (web UI)
+        working-directory: deploy/zerotier-ui
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-ui up -d --build
 
       - name: Show bird status
         run: docker exec bird-border birdc show status
@@ -72,7 +72,7 @@ jobs:
             echo ""
             echo "### Deployments"
             echo "- ✅ Bird-border (zerotier controller + bird)"
-            echo "- ✅ ztncui (ZeroTier web UI)"
+            echo "- ✅ zerotier-ui (ZeroTier web UI)"
             echo ""
             echo "### Details"
             echo "- Event: ${{ github.event_name }}"

@@ -17,8 +17,8 @@ permissions:
   contents: read
 
 jobs:
-  validate-zerotier-controller:
-    name: Validate ZeroTier Controller
+  validate-zerotier-ui:
+    name: Validate ZeroTier UI
     runs-on: ubuntu-latest
     environment: zerotier-action
 
@@ -26,8 +26,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create zerotier-controller .env file
-        working-directory: deploy/zerotier-controller
+      - name: Create zerotier-ui .env file
+        working-directory: deploy/zerotier-ui
         run: |
           cat > .env << 'ENV'
           ZEROTIER_VERSION=1.16.0
@@ -39,21 +39,21 @@ jobs:
           ENV
 
       - name: Validate docker-compose configuration
-        working-directory: deploy/zerotier-controller
+        working-directory: deploy/zerotier-ui
         run: |
-          echo "=== Validating zerotier-controller docker-compose ==="
+          echo "=== Validating zerotier-ui docker-compose ==="
           docker compose config
           echo ""
           echo "=== Services found ==="
           docker compose config --services
           echo ""
-          echo "✓ ZeroTier controller configuration validated successfully"
+          echo "✓ ZeroTier UI configuration validated successfully"
 
   validate-bird-border:
     name: Validate Bird-Border
     runs-on: ubuntu-latest
     environment: bird-border-action
-    needs: validate-zerotier-controller
+    needs: validate-zerotier-ui
 
     steps:
       - name: Checkout repository
@@ -105,7 +105,7 @@ jobs:
   validate-zerotier-client:
     name: Validate ZeroTier Client
     runs-on: ubuntu-latest
-    needs: validate-zerotier-controller
+    needs: validate-zerotier-ui
 
     steps:
       - name: Checkout repository
@@ -135,7 +135,7 @@ jobs:
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [validate-zerotier-controller, validate-bird-border, validate-zerotier-client]
+    needs: [validate-zerotier-ui, validate-bird-border, validate-zerotier-client]
     if: always()
 
     steps:
@@ -147,7 +147,7 @@ jobs:
             echo "### Validation Results"
             echo "| Component | Status |"
             echo "|-----------|--------|"
-            echo "| ZeroTier Controller | ${{ needs.validate-zerotier-controller.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
+            echo "| ZeroTier UI | ${{ needs.validate-zerotier-ui.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo "| Bird-Border | ${{ needs.validate-bird-border.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo "| ZeroTier Client | ${{ needs.validate-zerotier-client.result == 'success' && '✅ Passed' || '❌ Failed' }} |"
             echo ""
@@ -158,7 +158,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check overall status
-        if: needs.validate-zerotier-controller.result != 'success' || needs.validate-bird-border.result != 'success' || needs.validate-zerotier-client.result != 'success'
+        if: needs.validate-zerotier-ui.result != 'success' || needs.validate-bird-border.result != 'success' || needs.validate-zerotier-client.result != 'success'
         run: |
           echo "One or more validations failed"
           exit 1

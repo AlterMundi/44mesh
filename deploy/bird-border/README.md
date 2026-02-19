@@ -18,9 +18,9 @@ Border node that connects the ZeroTier mesh to external networks via BGP.
    - `net.ipv4.ip_forward=1` enabled
    - IP address in the BGP peering network (for BGP peering with ISP)
 
-> **Note:** This stack runs the ZeroTier controller (not `deploy/zerotier-controller/`, which
-> is the ztncui web UI only). After first deploy, create the network and set `ingressNodeV4`
-> via the controller API — see [docs/ZEROTIER.md](../../docs/ZEROTIER.md).
+> **Note:** This stack runs the ZeroTier controller (not `deploy/zerotier-ui/`, which
+> is the web UI only). After first deploy, create the network and set `ingressNodeV4`
+> via the controller API or the web UI — see [docs/ZEROTIER.md](../../docs/ZEROTIER.md).
 
 ## Network Configuration
 
