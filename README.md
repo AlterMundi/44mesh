@@ -26,17 +26,17 @@ Create an independent AS that:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         BORDER ROUTER (your AS)                             │
 │                                                                             │
-│   ┌──────────────────────┐     ┌──────────────────────────┐               │
-│   │       BIRD           │     │       ZeroTier           │               │
-│   │  BGP AS ${BORDER_   │     │  controller + client     │               │
-│   │   ROUTER_AS}         │     │                          │               │
-│   │                      │     │  assigns IPs from range  │               │
-│   │  announces           │     │  source-routes return    │               │
-│   │  ${MESH_ADDRESS_     │     │  traffic to ISP          │               │
-│   │   RANGE}             │     │  (policy table 123)      │               │
-│   └──────────────────────┘     └──────────────────────────┘               │
+│   ┌──────────────────────┐     ┌──────────────────────────┐                 │
+│   │       BIRD           │     │       ZeroTier           │                 │
+│   │  BGP AS ${BORDER_    │     │  controller + client     │                 │
+│   │   ROUTER_AS}         │     │                          │                 │
+│   │                      │     │  assigns IPs from range  │                 │
+│   │  announces           │     │  source-routes return    │                 │
+│   │  ${MESH_ADDRESS_     │     │  traffic to ISP          │                 │
+│   │   RANGE}             │     │  (policy table 123)      │                 │
+│   └──────────────────────┘     └──────────────────────────┘                 │
 │                                                                             │
-│   Connects your AS to both: Internet (BGP) and your mesh (ZeroTier)        │
+│   Connects your AS to both: Internet (BGP) and your mesh (ZeroTier)         │
 └─────────────────────────────────────────────────────────────────────────────┘
                                   │
                                   │ ZeroTier mesh
@@ -44,7 +44,7 @@ Create an independent AS that:
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
 │   Mesh Node 1    │    │   Mesh Node 2    │    │   Mesh Node N    │
 │   IP from        │    │   IP from        │    │   IP from        │
-│   ${MESH_       │    │   ${MESH_       │    │   ${MESH_       │
+│   ${MESH_        │    │   ${MESH_        │    │   ${MESH_        │
 │    ADDRESS_      │    │    ADDRESS_      │    │    ADDRESS_      │
 │    RANGE}        │    │    RANGE}        │    │    RANGE}        │
 │   zerotier       │    │   zerotier       │    │   zerotier       │
@@ -190,19 +190,19 @@ See [deploy/rpi-isp/README.md](deploy/rpi-isp/README.md) for full mock ISP setup
 ```
 ┌─────────────────┐                    ┌─────────────────┐
 │   RPi (mock)    │◄───── BGP ────────►│  Border Router  │
-│ AS ${ISP_AS}   │     ${BGP_         │  AS ${BORDER_  │
-│ ${ISP_IP}      │      NETWORK_       │   ROUTER_AS}    │
-│                 │      RANGE}         │ ${BORDER_      │
+│ AS ${ISP_AS}    │     ${BGP_         │  AS ${BORDER_   │
+│ ${ISP_IP}       │      NETWORK_      │   ROUTER_AS}    │
+│                 │      RANGE}        │ ${BORDER_       │
 │ announces test  │                    │  ROUTER_IP}     │
 │ prefixes        │                    │                 │
-│                 │ ingress node        │                 │
+│                 │ ingress node       │                 │
 └─────────────────┘                    └─────────────────┘
                                               │
                                               │ mesh
                                               ▼
                                        ┌─────────────────┐
                                        │  Mesh Nodes     │
-                                       │ ${MESH_        │
+                                       │ ${MESH_         │
                                        │  ADDRESS_       │
                                        │  RANGE}         │
                                        │  zerotier       │
