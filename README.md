@@ -26,14 +26,15 @@ Create an independent AS that:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         BORDER ROUTER (your AS)                             │
 │                                                                             │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                  │
-│   │    BIRD     │     │  zerotier   │     │  Egress GW  │                  │
-│   │  AS 65000   │     │  (Mesh)     │     │  announces  │                  │
-│   │             │     │             │     │  routes to  │                  │
-│   │ announces:  │     │ mesh IP:    │     │  mesh       │                  │
-│   │ ${MESH_    │     │ from range  │     │             │                  │
-│   │  ADDRESS_   │     │             │     │             │                  │
-│   └─────────────┘     └─────────────┘     └─────────────┘                  │
+│   ┌──────────────────────┐     ┌──────────────────────────┐               │
+│   │       BIRD           │     │       ZeroTier           │               │
+│   │  BGP AS ${BORDER_   │     │  controller + client     │               │
+│   │   ROUTER_AS}         │     │                          │               │
+│   │                      │     │  assigns IPs from range  │               │
+│   │  announces           │     │  source-routes return    │               │
+│   │  ${MESH_ADDRESS_     │     │  traffic to ISP          │               │
+│   │   RANGE}             │     │  (policy table 123)      │               │
+│   └──────────────────────┘     └──────────────────────────┘               │
 │                                                                             │
 │   Connects your AS to both: Internet (BGP) and your mesh (ZeroTier)        │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -55,10 +56,10 @@ Create an independent AS that:
 
 ### Outbound (mesh → Internet)
 
-1. A mesh node (IP from ${MESH_ADDRESS_RANGE}) wants to reach the Internet
-2. Traffic goes to the **border router** (egress gateway)
-3. Border router forwards to ISP via BGP peering
-4. Response comes back the same path
+1. A mesh node (IP from `${MESH_ADDRESS_RANGE}`) wants to reach the Internet
+2. The AlterMundi ZeroTier fork installs source-based policy routing on the node: traffic sourced from the node's mesh IP is routed via the ZeroTier interface to the border router
+3. Border router forwards to the ISP via BGP peering (policy table 123)
+4. Response arrives at the border router and is forwarded back through ZeroTier to the node
 
 ### Inbound (Internet → mesh)
 
@@ -67,36 +68,40 @@ Create an independent AS that:
 3. ISP sends to your **border router**
 4. Border router forwards via ZeroTier mesh to the node
 
-### Key Insight: Egress Gateway
+### Key Insight: Ingress Node
 
-The border router must be configured as an **egress gateway** by routing traffic for `${MESH_ADDRESS_RANGE}` via the ZeroTier interface. All mesh nodes receive the route from the controller.
+The border router acts as the **ingress node** for the mesh. It runs the ZeroTier controller and sets `ingressNodeV4` to its own mesh IP. Every node that joins receives this value and the AlterMundi fork automatically installs per-node source-based policy routing, directing return traffic through the border router. The border router then forwards that traffic to the ISP using a dedicated routing table.
+
+See [docs/ZEROTIER.md](docs/ZEROTIER.md) for a full explanation of the ingress routing architecture.
 
 ## Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `deploy/zerotier-controller/` | Public server | ZeroTier control plane + UI |
-| `deploy/bird-border/` | Datacenter | Border router: BGP + mesh gateway |
-| `deploy/zerotier/` | Any location | Standalone mesh node |
+| `deploy/bird-border/` | Public server | ZeroTier controller + BGP (BIRD) — the border router |
+| `deploy/zerotier-controller/` | Same server | ztncui web UI for member management |
+| `deploy/zerotier/` | Any location | Mesh node (client) |
 
-### ZeroTier Controller (`deploy/zerotier-controller/`)
+### Border Router + Controller (`deploy/bird-border/`)
 
-Central control plane for the mesh. Runs on a public server with:
-- ZeroTier controller (non-free build)
-- ztncui web UI
-
-### Border Router (`deploy/bird-border/`)
-
-The critical component that bridges your AS to the Internet:
+The central component. Runs the ZeroTier controller and BGP daemon on the same host:
+- **ZeroTier controller**: built from [AlterMundi/ZeroTierOne](https://github.com/AlterMundi/ZeroTierOne) (`feature/ingress-node`), manages network membership and distributes `ingressNodeV4` config to all nodes
 - **BIRD**: BGP daemon, announces your IP block to the ISP
-- **zerotier**: Connects to the mesh
-- **Egress Gateway**: Announces routes to mesh nodes
+- **Ingress node**: forwards public IP traffic from the internet to mesh nodes via source-based policy routing
+
+### ztncui Web UI (`deploy/zerotier-controller/`)
+
+Web interface for authorizing members and inspecting network state. Reads the
+controller auth token from the shared `zerotier_data` volume.
+
+> **Note:** The ZeroTier controller itself runs inside `deploy/bird-border/`, not here.
+> This stack only provides the ztncui UI.
 
 ### Mesh Nodes (`deploy/zerotier/`)
 
 Simple nodes that join the mesh:
-- Run zerotier to establish overlay
-- Receive routes from egress gateway
+- Run zerotier (AlterMundi fork) to establish overlay
+- Receive `ingressNodeV4` config from the controller and install source routing automatically
 - Can host services accessible from the Internet
 
 ## Network Addressing
@@ -136,7 +141,25 @@ cp deploy/rpi-isp/.env.example deploy/rpi-isp/.env  # if using mock ISP
 
 Edit each `.env` file with your specific values. See `.env.example` files for documentation.
 
-### 1. Deploy ZeroTier Controller
+### 1. Deploy Border Router (contains the controller)
+
+```bash
+cd deploy/bird-border
+cp .env.example .env
+# Edit .env: set BGP vars; ZT_NETWORK_ID can be added after creating the network
+
+docker compose up -d
+```
+
+See [deploy/bird-border/README.md](deploy/bird-border/README.md) for BGP configuration.
+
+### 2. Create Mesh Network
+
+Use the ZeroTier controller API to create the network and configure `ingressNodeV4`.
+
+See **[docs/ZEROTIER.md](docs/ZEROTIER.md)** for the full step-by-step procedure.
+
+### 3. Deploy ztncui Web UI (optional)
 
 ```bash
 cd deploy/zerotier-controller
@@ -146,33 +169,14 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-See [deploy/zerotier-controller/README.md](deploy/zerotier-controller/README.md) for full instructions.
-
-### 2. Create Mesh Network
-
-Use ztncui UI to:
-- Create a network
-- Set **Auto-Assign Range** to `${MESH_ADDRESS_RANGE}`
-- Add a **Managed Route** for `${MESH_ADDRESS_RANGE}`
-
-### 3. Deploy Border Router
-
-```bash
-cd deploy/bird-border
-cp .env.example .env
-# Add ZT_NETWORK_ID from ztncui
-
-docker compose up -d
-```
-
-See [deploy/bird-border/README.md](deploy/bird-border/README.md) for BGP configuration.
+See [deploy/zerotier-controller/README.md](deploy/zerotier-controller/README.md) for details.
 
 ### 4. Deploy Mesh Nodes
 
 ```bash
 cd deploy/zerotier
 cp .env.example .env
-# Add ZT_NETWORK_ID
+# Set ZT_NETWORK_ID
 
 docker compose up -d
 ```
@@ -191,7 +195,7 @@ See [deploy/rpi-isp/README.md](deploy/rpi-isp/README.md) for full mock ISP setup
 │                 │      RANGE}         │ ${BORDER_      │
 │ announces test  │                    │  ROUTER_IP}     │
 │ prefixes        │                    │                 │
-│                 │ egress gateway      │                 │
+│                 │ ingress node        │                 │
 └─────────────────┘                    └─────────────────┘
                                               │
                                               │ mesh

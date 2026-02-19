@@ -1,4 +1,11 @@
-# ZeroTier Replacement Design
+# ZeroTier Replacement Design (Executed)
+
+> **Status:** Implemented. See [../../docs/ZEROTIER.md](../../docs/ZEROTIER.md) for current
+> architecture documentation. Key additions beyond this original design:
+> - Controller built from [AlterMundi/ZeroTierOne](https://github.com/AlterMundi/ZeroTierOne) fork (`feature/ingress-node`)
+> - `ingressNodeV4` field drives automatic per-node source-based policy routing
+> - Controller runs inside `deploy/bird-border/`, not `deploy/zerotier-controller/` (ztncui only)
+> - Source routing table 123 installed by `bird/entrypoint.sh` for return traffic to ISP
 
 ## Goal
 Replace Netmaker with a self-hosted ZeroTier controller + ztncui UI, using public roots only and keeping `${MESH_ADDRESS_RANGE}` for the overlay network.

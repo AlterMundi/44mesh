@@ -1,18 +1,22 @@
-# ZeroTier Controller + UI
+# ztncui Web UI
 
-Self-hosted ZeroTier controller (non-free build) with the ztncui web UI.
+Web interface for ZeroTier member management. Reads the controller auth token
+from the shared `zerotier_data` volume mounted from `deploy/bird-border/`.
+
+> **Note:** The ZeroTier controller itself runs inside `deploy/bird-border/`, not here.
+> This stack only provides the ztncui UI.
 
 ## Prerequisites
 
+- `deploy/bird-border/` running (controller + shared `zerotier_data` volume)
 - Docker + Docker Compose
-- Public server with UDP 9993 open
 
 ## Setup
 
 ```bash
 cd deploy/zerotier-controller
 cp .env.example .env
-# Edit .env as needed
+# Edit .env: set ZTNCUI_PASSWD and ports
 
 docker compose up -d --build
 ```
@@ -25,14 +29,15 @@ By default, ztncui listens on:
 
 Login with the password set in `ZTNCUI_PASSWD`.
 
-## Create Network
+## Creating / Managing Networks
 
-1. Create a new network in ztncui.
-2. Set **Auto-Assign Range** to `${MESH_ADDRESS_RANGE}`.
-3. Add a **Managed Route** for `${MESH_ADDRESS_RANGE}`.
-4. For each member, enable **Allow Global** so public IPs are accepted.
+For initial network setup (creating the network, setting `ingressNodeV4`, authorizing
+members), use the ZeroTier controller API directly. See
+[../../docs/ZEROTIER.md](../../docs/ZEROTIER.md) for the full procedure.
+
+ztncui is useful for day-to-day member authorization and network inspection.
 
 ## Notes
 
-- The controller is built with `ZT_NONFREE=1` in `Dockerfile.controller`.
-- ztncui reads the controller auth token from `/var/lib/zerotier-one/authtoken.secret`.
+- ZeroTier binaries are built from the [AlterMundi/ZeroTierOne](https://github.com/AlterMundi/ZeroTierOne) fork (`feature/ingress-node` branch) in `Dockerfile.controller`.
+- ztncui reads the controller auth token from `/var/lib/zerotier-one/authtoken.secret` (shared volume).

@@ -13,13 +13,14 @@ Border node that connects the ZeroTier mesh to external networks via BGP.
 
 ## Prerequisites
 
-1. **ZeroTier controller running** (see `deploy/zerotier-controller/`)
-2. **Network ID** from ZeroTier
-3. **Member approved + Allow Global enabled** in ztncui (Allow Global lets ZeroTier assign
-   public IPs from your address range instead of only private RFC1918 addresses)
-4. **Host requirements**:
+1. **Network ID** — create the ZeroTier network after first deploy (see [../../docs/ZEROTIER.md](../../docs/ZEROTIER.md))
+2. **Host requirements**:
    - `net.ipv4.ip_forward=1` enabled
    - IP address in the BGP peering network (for BGP peering with ISP)
+
+> **Note:** This stack runs the ZeroTier controller (not `deploy/zerotier-controller/`, which
+> is the ztncui web UI only). After first deploy, create the network and set `ingressNodeV4`
+> via the controller API — see [docs/ZEROTIER.md](../../docs/ZEROTIER.md).
 
 ## Network Configuration
 

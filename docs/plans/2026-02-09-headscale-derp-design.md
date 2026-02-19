@@ -1,4 +1,7 @@
-# Headscale + DERP Replacement Design
+# Headscale + DERP Replacement Design (Deprecated)
+
+> **Deprecated:** This design was abandoned. ZeroTier was chosen instead because Headscale/Tailscale
+> cannot assign arbitrary public IP ranges to nodes. See `2026-02-09-zerotier-design.md`.
 
 ## Goal
 Replace Netmaker with a self-hosted Tailscale-compatible control plane (Headscale) plus self-hosted DERP, while keeping mesh IPs on the public `${MESH_ADDRESS_RANGE}` block and preserving the current border-router/BGP flow.

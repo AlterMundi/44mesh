@@ -34,10 +34,10 @@ This mock ISP allows you to:
 │                                                                 │
 │   IP: ${BORDER_ROUTER_IP} (secondary IP for BGP peering)       │
 │   Mesh: from ${MESH_ADDRESS_RANGE}                             │
-│   Egress Gateway: announces external routes to mesh            │
+│   Ingress node: source-routes return traffic to ISP            │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              │ WireGuard mesh
+                              │ ZeroTier mesh
                               ▼
                          Mesh Nodes
                     ${MESH_ADDRESS_RANGE}
@@ -81,7 +81,7 @@ docker exec bird-isp birdc "show route protocol border_router"
 
 ## Test End-to-End Connectivity
 
-Once the border router is configured as **egress gateway** in Netmaker (see [../bird-border/README.md](../bird-border/README.md) for setup):
+Once the border router is running and mesh nodes are authorized (see [../bird-border/README.md](../bird-border/README.md) and [../../docs/ZEROTIER.md](../../docs/ZEROTIER.md)):
 
 ```bash
 # From RPi, ping any mesh node
@@ -89,9 +89,9 @@ ping <mesh-node-ip>  # any IP in ${MESH_ADDRESS_RANGE}
 
 # Should work because:
 # 1. RPi has route to ${MESH_ADDRESS_RANGE} via Border Router (BGP)
-# 2. Border Router forwards to mesh node via WireGuard
-# 3. Mesh node responds via Border Router (egress gateway route)
-# 4. Border Router forwards response back to RPi
+# 2. Border Router forwards to mesh node via ZeroTier
+# 3. Mesh node source-routes response back through border router (ingressNodeV4)
+# 4. Border Router forwards response back to RPi via ISP peering
 ```
 
 ## Test Prefixes
@@ -131,11 +131,12 @@ docker logs bird-isp
    docker exec bird-isp birdc show route ${MESH_ADDRESS_RANGE}
    ```
 
-3. Verify Border Router is egress gateway:
+3. Verify source routing is active on border router:
    ```bash
    # On border router host
-   curl -s "https://${SERVER_HOST}/api/nodes" \
-     -H "Authorization: Bearer $MASTER_KEY" | jq '.[] | select(.isegressgateway==true)'
+   ip rule show | grep ${MESH_ADDRESS_RANGE}
+   ip route show table 123
+   # Should show: default via ${ISP_IP}
    ```
 
 ### Routes not being exchanged
