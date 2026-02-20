@@ -8,7 +8,7 @@
 services:
   zerotier:
     image: buzondefede/44mesh-zerotier:latest
-    entrypoint: ["/usr/local/bin/controller-entrypoint.sh"]
+    entrypoint: ["/bin/bash", "/usr/local/bin/controller-entrypoint.sh"]
     container_name: zerotier
     cap_add:
       - NET_ADMIN
@@ -17,7 +17,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:
-      - ./controller-entrypoint.sh:/usr/local/bin/controller-entrypoint.sh:ro
+      - ../zerotier/controller-entrypoint.sh:/usr/local/bin/controller-entrypoint.sh:ro
       - zerotier_data:/var/lib/zerotier-one
     command: ["${ZT_NETWORK_ID}"]
     healthcheck:
