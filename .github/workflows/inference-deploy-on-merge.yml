@@ -30,7 +30,10 @@ jobs:
 
       - name: Deploy bird-border (zerotier + bird)
         working-directory: deploy/bird-border
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d --build
+        run: |
+          # zerotier service is image-based (not built here), so pull to avoid stale local "latest".
+          docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border pull zerotier
+          docker compose --env-file /home/github-runner/configs/44mesh/.env.bird-border up -d --build
 
       - name: Wait for zerotier healthy and bird running
         shell: bash
