@@ -29,7 +29,8 @@ ENV ZTNCUI_HTTP_ALL_INTERFACES=
 ENV ZTNCUI_HTTPS_HOST=
 ENV ZTNCUI_PASSWD=
 
-RUN useradd --create-home --shell /bin/false --uid 999 --gid 995 ztncui \
+RUN groupadd --gid 995 ztgrp \
+ && useradd --create-home --shell /bin/false --uid 999 --gid 995 ztncui \
  && chown -R ztncui /opt/altermundi/zerotier-ui
 
 USER ztncui
