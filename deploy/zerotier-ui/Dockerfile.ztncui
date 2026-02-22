@@ -29,6 +29,11 @@ ENV ZTNCUI_HTTP_ALL_INTERFACES=
 ENV ZTNCUI_HTTPS_HOST=
 ENV ZTNCUI_PASSWD=
 
+RUN useradd --create-home --shell /bin/false ztncui \
+ && chown -R ztncui:ztncui /opt/altermundi/zerotier-ui
+
+USER ztncui
+
 EXPOSE 3180
 EXPOSE 3443
 
