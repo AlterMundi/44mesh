@@ -63,7 +63,40 @@ jobs:
 
       - name: Deploy zerotier-ui (web UI)
         working-directory: deploy/zerotier-ui
-        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-ui up -d --build
+        run: docker compose --env-file /home/github-runner/configs/44mesh/.env.zerotier-ui up -d --build --force-recreate
+
+      - name: Wait for zerotier-ui healthy
+        shell: bash
+        run: |
+          timeout=120
+          interval=5
+          elapsed=0
+
+          while [ $elapsed -lt $timeout ]; do
+            health="$(docker inspect -f '{{.State.Health.Status}}' zerotier-ui 2>/dev/null || true)"
+            if [ "$health" = "healthy" ]; then
+              echo "zerotier-ui is healthy."
+              # Verify critical env vars were applied
+              all_ifaces="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' zerotier-ui | grep ZTNCUI_HTTP_ALL_INTERFACES)"
+              echo "Container env: $all_ifaces"
+              if echo "$all_ifaces" | grep -q "=true"; then
+                echo "HTTP_ALL_INTERFACES correctly set."
+                exit 0
+              else
+                echo "ERROR: ZTNCUI_HTTP_ALL_INTERFACES not set to 'true' — env file may not have been applied."
+                docker logs zerotier-ui 2>&1 | tail -10
+                exit 1
+              fi
+            fi
+
+            echo "Waiting... zerotier-ui=$health (${elapsed}s/${timeout}s)"
+            sleep "$interval"
+            elapsed=$((elapsed + interval))
+          done
+
+          echo "Timeout waiting for zerotier-ui healthy."
+          docker logs zerotier-ui 2>&1 | tail -20
+          exit 1
 
       - name: Show bird status
         run: docker exec bird-border birdc show status
