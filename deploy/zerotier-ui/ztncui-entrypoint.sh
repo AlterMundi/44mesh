@@ -45,6 +45,7 @@ chown -R ztncui:ztgrp "${ETC_DIR}"
 } > "$ENV_FILE"
 
 chmod 600 "$ENV_FILE"
+chown ztncui "$ENV_FILE"
 
 cd /opt/altermundi/zerotier-ui/src
 exec gosu ztncui npm start
