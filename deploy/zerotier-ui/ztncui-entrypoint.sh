@@ -20,6 +20,17 @@ fi
 : "${ZTNCUI_HTTPS_HOST:=}"
 : "${ZTNCUI_PASSWD:=password}"
 : "${NODE_ENV:=production}"
+: "${SESSION_SECRET:=}"
+
+# Warn if SESSION_SECRET is not configured (sessions won't survive restarts)
+if [ -z "$SESSION_SECRET" ]; then
+    echo "WARNING: SESSION_SECRET not set — sessions will be lost on container restart"
+fi
+
+# Fix volume permissions so ztncui can write to etc/storage
+ETC_DIR="/opt/altermundi/zerotier-ui/src/etc"
+mkdir -p "${ETC_DIR}/storage"
+chown -R ztncui:ztgrp "${ETC_DIR}"
 
 {
     echo "ZT_TOKEN=$ZT_TOKEN"
@@ -30,9 +41,10 @@ fi
     echo "HTTP_ALL_INTERFACES=$ZTNCUI_HTTP_ALL_INTERFACES"
     [ -n "$ZTNCUI_HTTPS_HOST" ] && echo "HTTPS_HOST=$ZTNCUI_HTTPS_HOST"
     echo "PASSWD=$ZTNCUI_PASSWD"
+    [ -n "$SESSION_SECRET" ] && echo "SESSION_SECRET=$SESSION_SECRET"
 } > "$ENV_FILE"
 
 chmod 600 "$ENV_FILE"
 
 cd /opt/altermundi/zerotier-ui/src
-exec npm start
+exec gosu ztncui npm start

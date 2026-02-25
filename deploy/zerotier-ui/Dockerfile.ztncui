@@ -6,11 +6,12 @@ RUN apt-get update && apt-get install -y \
     make \
     g++ \
     curl \
+    gosu \
   && rm -rf /var/lib/apt/lists/*
 
 # AlterMundi fork with full network field edit UI
 WORKDIR /opt/altermundi
-RUN git clone --branch v0.0.11-altermundi https://github.com/altermundi/zerotier-ui /opt/altermundi/zerotier-ui
+RUN git clone --branch v0.0.12-altermundi https://github.com/altermundi/zerotier-ui /opt/altermundi/zerotier-ui
 
 WORKDIR /opt/altermundi/zerotier-ui/src
 RUN npm install
@@ -33,8 +34,7 @@ RUN groupadd --gid 995 ztgrp \
  && useradd --create-home --shell /bin/false --uid 999 --gid 995 ztncui \
  && chown -R ztncui /opt/altermundi/zerotier-ui
 
-USER ztncui
-
+# Entrypoint runs as root to fix volume permissions, then drops to ztncui via gosu
 EXPOSE 3180
 EXPOSE 3443
 

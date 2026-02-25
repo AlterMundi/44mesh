@@ -12,6 +12,7 @@ services:
       ZTNCUI_HTTP_ALL_INTERFACES: "${ZTNCUI_HTTP_ALL_INTERFACES:-true}"
       ZTNCUI_HTTPS_HOST: "${ZTNCUI_HTTPS_HOST:-}"
       ZTNCUI_PASSWD: "${ZTNCUI_PASSWD:?ZTNCUI_PASSWD must be set}"
+      SESSION_SECRET: "${SESSION_SECRET:-}"
     volumes:
       - bird-border_zerotier_data:/var/lib/zerotier-one:ro
       - zerotier_ui_etc:/opt/altermundi/zerotier-ui/src/etc
