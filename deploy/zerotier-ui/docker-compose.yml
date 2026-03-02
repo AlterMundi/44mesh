@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ztncui
+    image: buzondefede/44mesh-zerotier-ui:latest
     container_name: zerotier-ui
     network_mode: host
     environment:
