@@ -1,0 +1,502 @@
+name: Integration Test - VPN Mesh Connectivity
+
+# Tests the full stack end-to-end:
+#   1. ZeroTier controller creates a private mesh network
+#   2. BIRD border router establishes BGP session with mock ISP
+#   3. Mesh range (44.30.127.0/24) is exported via BGP
+#   4. Two ZeroTier client nodes join the mesh and receive IPs
+#   5. Nodes can ping each other over the ZeroTier overlay
+#
+# Networking strategy:
+#   - Controller + BIRD services run with --network host (share host namespace)
+#   - ZT client nodes run on a bridge network (own namespace, no zt* name conflict)
+#   - Host gets secondary IPs for BGP: 172.30.0.1 (ISP), 172.30.0.100 (border)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/integration-test.yml"
+  push:
+    branches: [stage]
+    paths:
+      - "deploy/**"
+  workflow_dispatch:
+
+concurrency:
+  group: integration-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mesh-integration-test:
+    name: Mesh VPN Integration Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      MESH_RANGE: "44.30.127.0/24"
+      ISP_IP: "172.30.0.1"
+      BORDER_IP: "172.30.0.100"
+      ISP_AS: "65001"
+      BORDER_AS: "65000"
+
+    steps:
+      # ── SETUP ───────────────────────────────────────────────────────────────
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load kernel modules and configure host networking
+        run: |
+          set -Eeuo pipefail
+
+          # TUN module is required by ZeroTier
+          sudo modprobe tun
+
+          # Detect the default egress interface (works on EC2, GCP, Azure, etc.)
+          DEFAULT_IFACE=$(ip -o route get 8.8.8.8 | awk '{print $5}' | head -1)
+          DEFAULT_IFACE="${DEFAULT_IFACE:-eth0}"
+          echo "Default interface: $DEFAULT_IFACE"
+          echo "DEFAULT_IFACE=$DEFAULT_IFACE" >> "$GITHUB_ENV"
+
+          # Add secondary IPs so BIRD ISP (172.30.0.1) and border router
+          # (172.30.0.100) can peer over the same physical interface
+          sudo ip addr add 172.30.0.1/24   dev "$DEFAULT_IFACE" label "${DEFAULT_IFACE}:isp"
+          sudo ip addr add 172.30.0.100/24 dev "$DEFAULT_IFACE" label "${DEFAULT_IFACE}:border"
+
+          # Isolated Docker bridge for ZT client nodes
+          # (each client gets its own network namespace → no zt* name conflicts)
+          docker network create \
+            --driver bridge \
+            --subnet 172.31.0.0/24 \
+            mesh-test-net
+
+          echo "=== Host network setup ==="
+          ip addr show "$DEFAULT_IFACE"
+          docker network inspect mesh-test-net --format '{{.IPAM.Config}}'
+
+      - name: Build BIRD border router image
+        run: docker build -t 44mesh-bird-border:ci deploy/bird-border/
+
+      - name: Build mock ISP image
+        run: docker build -t 44mesh-bird-isp:ci deploy/rpi-isp/
+
+      - name: Pull ZeroTier image
+        run: docker pull buzondefede/44mesh-zerotier:latest
+
+      # ── ZEROTIER CONTROLLER ─────────────────────────────────────────────────
+
+      - name: Start ZeroTier controller
+        run: |
+          set -Eeuo pipefail
+          # Runs on host network: its zt* interface will appear in the host
+          # namespace and will be visible to bird-border later.
+          # SYS_ADMIN is NOT required; NET_ADMIN + /dev/net/tun are sufficient.
+          docker run -d \
+            --name zt-controller \
+            --network host \
+            --cap-add NET_ADMIN \
+            --device /dev/net/tun \
+            -v zt-ctrl-data:/var/lib/zerotier-one \
+            -v "$(pwd)/deploy/zerotier/controller-entrypoint.sh:/usr/local/bin/controller-entrypoint.sh:ro" \
+            --entrypoint /bin/bash \
+            buzondefede/44mesh-zerotier:latest \
+            /usr/local/bin/controller-entrypoint.sh
+
+      - name: Wait for ZeroTier controller to come online
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for controller (up to 90s)..."
+          timeout 90 bash -c '
+            until docker exec zt-controller zerotier-cli -j info 2>/dev/null \
+                | jq -e ".online == true" > /dev/null 2>&1; do
+              sleep 3
+            done
+          '
+          docker exec zt-controller zerotier-cli info
+
+      - name: Create ZeroTier mesh network
+        run: |
+          set -Eeuo pipefail
+          CTRL_ID=$(docker exec zt-controller zerotier-cli -j info | jq -r '.address')
+          API_SECRET=$(docker exec zt-controller cat /var/lib/zerotier-one/authtoken.secret)
+
+          echo "Controller node ID: $CTRL_ID"
+
+          # Network ID = <controller-node-id> + 6 hex chars. Using ______ as
+          # the suffix lets the controller expand it to a valid unique ID.
+          NETWORK=$(curl -sf -X POST \
+            -H "X-ZT1-Auth: ${API_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"ci-test-mesh\",
+              \"private\": true,
+              \"v4AssignMode\": {\"zt\": true},
+              \"ipAssignmentPools\": [{
+                \"ipRangeStart\": \"44.30.127.10\",
+                \"ipRangeEnd\": \"44.30.127.50\"
+              }],
+              \"routes\": [{\"target\": \"44.30.127.0/24\"}]
+            }" \
+            "http://localhost:9993/controller/network/${CTRL_ID}______")
+
+          NETWORK_ID=$(echo "$NETWORK" | jq -r '.id')
+          [ -n "$NETWORK_ID" ] || { echo "✗ FAIL: empty network ID from controller API"; exit 1; }
+          echo "Network created: $NETWORK_ID"
+
+          echo "ZT_NETWORK_ID=$NETWORK_ID" >> "$GITHUB_ENV"
+          echo "ZT_API_SECRET=$API_SECRET" >> "$GITHUB_ENV"
+          echo "ZT_CTRL_ID=$CTRL_ID"       >> "$GITHUB_ENV"
+
+      - name: Controller joins its own network and receives a static mesh IP
+        run: |
+          set -Eeuo pipefail
+          docker exec zt-controller zerotier-cli join "$ZT_NETWORK_ID"
+
+          # Poll until the member record appears in the controller, then authorize
+          timeout 30 bash -c '
+            until curl -sf \
+              -H "X-ZT1-Auth: $ZT_API_SECRET" \
+              "http://localhost:9993/controller/network/$ZT_NETWORK_ID/member/$ZT_CTRL_ID" \
+              | jq -e ".id" > /dev/null 2>&1; do
+              sleep 2
+            done
+          '
+
+          curl -sf -X POST \
+            -H "X-ZT1-Auth: $ZT_API_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"authorized": true, "ipAssignments": ["44.30.127.1"]}' \
+            "http://localhost:9993/controller/network/${ZT_NETWORK_ID}/member/${ZT_CTRL_ID}"
+
+          echo "Controller authorized with IP 44.30.127.1"
+
+      - name: Verify host zt* interface has mesh IP before starting BIRD
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for zt* interface on host with 44.30.127.1/24 (up to 90s)..."
+          timeout 90 bash -c '
+            until ip addr show | grep -q "44.30.127.1"; do sleep 3; done
+          '
+          ZT_IFACE=$(ip -o link show | awk -F": " "{print \$2}" | grep "^zt" | head -1)
+          echo "ZT interface: $ZT_IFACE"
+          ip addr show "$ZT_IFACE"
+
+      # ── BGP SERVICES ────────────────────────────────────────────────────────
+
+      - name: Start BIRD border router
+        run: |
+          set -Eeuo pipefail
+          docker run -d \
+            --name bird-border \
+            --network host \
+            --cap-add NET_ADMIN \
+            -e BORDER_ROUTER_AS=65000 \
+            -e BORDER_ROUTER_IP=172.30.0.100 \
+            -e ISP_AS=65001 \
+            -e ISP_IP=172.30.0.1 \
+            -e MESH_ADDRESS_RANGE=44.30.127.0/24 \
+            -e BGP_HOLD_TIME=30 \
+            -e BGP_KEEPALIVE_TIME=10 \
+            -v "$(pwd)/deploy/bird-border/bird.conf.template:/etc/bird/bird.conf.template:ro" \
+            44mesh-bird-border:ci
+
+      - name: Start mock ISP (BIRD)
+        run: |
+          set -Eeuo pipefail
+          docker run -d \
+            --name bird-isp \
+            --network host \
+            --cap-add NET_ADMIN \
+            -e ISP_AS=65001 \
+            -e ISP_IP=172.30.0.1 \
+            -e BORDER_ROUTER_AS=65000 \
+            -e BORDER_ROUTER_IP=172.30.0.100 \
+            -e BGP_NETWORK_RANGE=172.30.0.0/24 \
+            -e MESH_ADDRESS_RANGE=44.30.127.0/24 \
+            -e TEST_PREFIX_1=192.0.2.0/24 \
+            -e TEST_PREFIX_2=198.51.100.0/24 \
+            -e TEST_PREFIX_3=203.0.113.0/24 \
+            -e BGP_HOLD_TIME=30 \
+            -e BGP_KEEPALIVE_TIME=10 \
+            -v "$(pwd)/deploy/rpi-isp/bird.conf.template:/etc/bird/bird.conf.template:ro" \
+            44mesh-bird-isp:ci
+
+      - name: Verify BGP listeners bound on expected IPs
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for TCP/179 listeners to appear (up to 30s)..."
+          timeout 30 bash -c '
+            until ss -nltp | grep -q ":179"; do sleep 2; done
+          '
+          echo "=== BGP listeners (TCP/179) ==="
+          ss -nltp 'sport = :179'
+          # Both border (172.30.0.100) and ISP (172.30.0.1) must be listening
+          ss -nltp 'sport = :179' | grep -q "172.30.0.100" || \
+            { echo "✗ FAIL: border router not listening on 172.30.0.100:179"; exit 1; }
+          ss -nltp 'sport = :179' | grep -q "172.30.0.1" || \
+            { echo "✗ FAIL: mock ISP not listening on 172.30.0.1:179"; exit 1; }
+          echo "✓ BGP listeners verified"
+
+      # ── TEST 1: BGP ──────────────────────────────────────────────────────────
+
+      - name: "TEST 1: BGP session established"
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for BGP session between border router and ISP (up to 90s)..."
+          timeout 90 bash -c '
+            until docker exec bird-border birdc show protocols 2>/dev/null | grep -q Established; do
+              echo "  $(docker exec bird-border birdc show protocols 2>/dev/null | grep -i bgp || echo "not ready")"
+              sleep 5
+            done
+          '
+          echo "=== BGP protocols ==="
+          docker exec bird-border birdc show protocols
+          echo "✓ BGP session established"
+
+      # ── TEST 2: Route export ─────────────────────────────────────────────────
+
+      - name: "TEST 2: Mesh route exported via BGP"
+        run: |
+          set -Eeuo pipefail
+
+          # Wait up to 60s for route propagation before asserting
+          echo "Waiting for 44.30.127.0/24 to appear in ISP routing table (up to 60s)..."
+          timeout 60 bash -c '
+            until docker exec bird-isp birdc show route 2>/dev/null | grep -q "44.30.127.0/24"; do
+              sleep 5
+            done
+          ' || true
+
+          echo "=== Routing table (border router) ==="
+          docker exec bird-border birdc show route
+          echo ""
+          echo "=== ISP received routes ==="
+          docker exec bird-isp birdc show route
+
+          if docker exec bird-isp birdc show route | grep -q "44.30.127.0/24"; then
+            echo "✓ Mesh route 44.30.127.0/24 received by ISP"
+          else
+            echo "✗ FAIL: Mesh route not found in ISP routing table"
+            exit 1
+          fi
+
+      # ── ZT CLIENT NODES ──────────────────────────────────────────────────────
+      # Clients run on a bridge network (mesh-test-net). Each gets its own Linux
+      # network namespace so each ZT daemon creates a separate zt* interface with
+      # no name collision. Outbound UDP from the bridge is NAT-ted through the
+      # host, enabling the ZT daemons to reach the controller and each other.
+
+      - name: Start ZeroTier mesh node 1
+        run: |
+          set -Eeuo pipefail
+          docker run -d \
+            --name zt-node1 \
+            --network mesh-test-net \
+            --cap-add NET_ADMIN \
+            --device /dev/net/tun \
+            -v zt-node1-data:/var/lib/zerotier-one \
+            -v "$(pwd)/deploy/zerotier/entrypoint.sh:/entrypoint.sh:ro" \
+            -v "$(pwd)/deploy/zerotier/local.conf:/var/lib/zerotier-one/local.conf:ro" \
+            -v "$(pwd)/deploy/zerotier/network.local.conf:/tmp/network.local.conf:ro" \
+            --entrypoint /entrypoint.sh \
+            buzondefede/44mesh-zerotier:latest \
+            "$ZT_NETWORK_ID"
+
+      - name: Start ZeroTier mesh node 2
+        run: |
+          set -Eeuo pipefail
+          docker run -d \
+            --name zt-node2 \
+            --network mesh-test-net \
+            --cap-add NET_ADMIN \
+            --device /dev/net/tun \
+            -v zt-node2-data:/var/lib/zerotier-one \
+            -v "$(pwd)/deploy/zerotier/entrypoint.sh:/entrypoint.sh:ro" \
+            -v "$(pwd)/deploy/zerotier/local.conf:/var/lib/zerotier-one/local.conf:ro" \
+            -v "$(pwd)/deploy/zerotier/network.local.conf:/tmp/network.local.conf:ro" \
+            --entrypoint /entrypoint.sh \
+            buzondefede/44mesh-zerotier:latest \
+            "$ZT_NETWORK_ID"
+
+      - name: Wait for client nodes to appear in controller and authorize them
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for 2 client nodes to reach the controller (up to 120s)..."
+          timeout 120 bash -c '
+            while true; do
+              COUNT=$(curl -sf \
+                -H "X-ZT1-Auth: $ZT_API_SECRET" \
+                "http://localhost:9993/controller/network/$ZT_NETWORK_ID/member" \
+                | jq "keys | length")
+              echo "  Members seen by controller: $COUNT (need ≥3: controller + 2 clients)"
+              [ "$COUNT" -ge 3 ] && break
+              sleep 5
+            done
+          '
+
+          # Authorize every member that is not the controller
+          MEMBERS=$(curl -sf \
+            -H "X-ZT1-Auth: $ZT_API_SECRET" \
+            "http://localhost:9993/controller/network/$ZT_NETWORK_ID/member" \
+            | jq -r 'keys[]')
+
+          for MEMBER in $MEMBERS; do
+            if [ "$MEMBER" != "$ZT_CTRL_ID" ]; then
+              echo "Authorizing member: $MEMBER"
+              curl -sf -X POST \
+                -H "X-ZT1-Auth: $ZT_API_SECRET" \
+                -H "Content-Type: application/json" \
+                -d '{"authorized": true}' \
+                "http://localhost:9993/controller/network/$ZT_NETWORK_ID/member/$MEMBER"
+            fi
+          done
+
+          # Short settle window: give clients time to fetch updated config
+          echo "Settling (10s) after authorization..."
+          sleep 10
+          echo "All client nodes authorized"
+
+      # ── TEST 3: Mesh node join ────────────────────────────────────────────────
+
+      - name: "TEST 3: ZeroTier nodes receive mesh IPs"
+        run: |
+          set -Eeuo pipefail
+
+          echo "Waiting for node1 to reach OK status (up to 180s)..."
+          timeout 180 bash -c '
+            until docker exec zt-node1 zerotier-cli -j listnetworks 2>/dev/null \
+                | jq -e ".[0].status == \"OK\"" > /dev/null 2>&1; do
+              echo "  node1: $(docker exec zt-node1 zerotier-cli listnetworks 2>/dev/null | tail -1)"
+              sleep 5
+            done
+          '
+
+          echo "Waiting for node2 to reach OK status (up to 180s)..."
+          timeout 180 bash -c '
+            until docker exec zt-node2 zerotier-cli -j listnetworks 2>/dev/null \
+                | jq -e ".[0].status == \"OK\"" > /dev/null 2>&1; do
+              echo "  node2: $(docker exec zt-node2 zerotier-cli listnetworks 2>/dev/null | tail -1)"
+              sleep 5
+            done
+          '
+
+          # Extract IPs from JSON and validate they are within 44.30.127.0/24
+          NODE1_IP=$(docker exec zt-node1 \
+            zerotier-cli -j listnetworks | \
+            jq -r --arg nw "$ZT_NETWORK_ID" \
+              '.[] | select(.id == $nw) | .assignedAddresses[] | select(test("^44\\.30\\.127\\.")) | split("/")[0]' \
+            | head -1)
+
+          NODE2_IP=$(docker exec zt-node2 \
+            zerotier-cli -j listnetworks | \
+            jq -r --arg nw "$ZT_NETWORK_ID" \
+              '.[] | select(.id == $nw) | .assignedAddresses[] | select(test("^44\\.30\\.127\\.")) | split("/")[0]' \
+            | head -1)
+
+          echo "Node 1 mesh IP: $NODE1_IP"
+          echo "Node 2 mesh IP: $NODE2_IP"
+          echo "NODE1_IP=$NODE1_IP" >> "$GITHUB_ENV"
+          echo "NODE2_IP=$NODE2_IP" >> "$GITHUB_ENV"
+
+          [ -n "$NODE1_IP" ] || { echo "✗ FAIL: node1 has no mesh IP in 44.30.127.0/24"; exit 1; }
+          [ -n "$NODE2_IP" ] || { echo "✗ FAIL: node2 has no mesh IP in 44.30.127.0/24"; exit 1; }
+          echo "✓ Both nodes received mesh IPs in 44.30.127.0/24"
+
+      # ── TEST 4: Mesh ping ─────────────────────────────────────────────────────
+
+      - name: "TEST 4: Node-to-node ping over ZeroTier mesh"
+        run: |
+          set -Eeuo pipefail
+
+          echo "=== Ping: node1 ($NODE1_IP) → node2 ($NODE2_IP) ==="
+          docker exec zt-node1 ping -c 5 -W 3 "$NODE2_IP" || {
+            echo "✗ FAIL: node1 cannot ping node2"
+            exit 1
+          }
+
+          echo ""
+          echo "=== Ping: node2 ($NODE2_IP) → node1 ($NODE1_IP) ==="
+          docker exec zt-node2 ping -c 5 -W 3 "$NODE1_IP" || {
+            echo "✗ FAIL: node2 cannot ping node1"
+            exit 1
+          }
+
+          echo "✓ Bidirectional mesh connectivity verified"
+
+      # ── DIAGNOSTICS ──────────────────────────────────────────────────────────
+
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          echo "::group::Container logs"
+          for c in zt-controller bird-border bird-isp zt-node1 zt-node2; do
+            echo "--- $c ---"
+            docker logs "$c" 2>/dev/null | tail -50 || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::Host network state"
+          ip addr
+          ip link
+          ip route
+          ss -nltp 'sport = :179' || true
+          echo "::endgroup::"
+
+          echo "::group::BIRD state"
+          docker exec bird-border birdc show protocols 2>/dev/null || true
+          docker exec bird-border birdc show route    2>/dev/null || true
+          docker exec bird-isp    birdc show protocols 2>/dev/null || true
+          echo "::endgroup::"
+
+          echo "::group::ZeroTier controller members"
+          curl -s \
+            -H "X-ZT1-Auth: ${ZT_API_SECRET:-}" \
+            "http://localhost:9993/controller/network/${ZT_NETWORK_ID:-}/member" \
+            2>/dev/null | jq . || true
+          echo "::endgroup::"
+
+          echo "::group::ZeroTier node status"
+          docker exec zt-node1 zerotier-cli -j listnetworks 2>/dev/null | jq . || true
+          docker exec zt-node2 zerotier-cli -j listnetworks 2>/dev/null | jq . || true
+          docker exec zt-node1 zerotier-cli -j peers        2>/dev/null | jq . || true
+          docker exec zt-node2 zerotier-cli -j peers        2>/dev/null | jq . || true
+          docker exec zt-node1 ip addr                      2>/dev/null || true
+          docker exec zt-node2 ip addr                      2>/dev/null || true
+          echo "::endgroup::"
+
+      # ── SUMMARY ──────────────────────────────────────────────────────────────
+
+      - name: Write job summary
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          ICON="$( [ "$STATUS" = success ] && echo '✅' || echo '❌' )"
+          {
+            echo "## Integration Test — $ICON ${STATUS^}"
+            echo ""
+            echo "**Branch:** \`${{ github.head_ref || github.ref_name }}\`"
+            echo "**Commit:** \`${{ github.sha }}\`"
+            echo ""
+            echo "### Scenarios"
+            echo "| # | Scenario | Validates |"
+            echo "|---|----------|-----------|"
+            echo "| 1 | BGP session established | Border ↔ ISP eBGP peering |"
+            echo "| 2 | Mesh route exported | 44.30.127.0/24 announced to ISP |"
+            echo "| 3 | ZT nodes receive IPs | Controller assigns from pool |"
+            echo "| 4 | Node-to-node ping | Overlay dataplane works |"
+            echo ""
+            echo "### Topology"
+            echo '```'
+            echo "  bird-isp (AS 65001 · 172.30.0.1)"
+            echo "       │ eBGP"
+            echo "  bird-border (AS 65000 · 172.30.0.100)"
+            echo "       │ sees zt* (44.30.127.1)"
+            echo "  zt-controller ────── zt-node1 (44.30.127.1x)"
+            echo "                  └─── zt-node2 (44.30.127.1x)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
