@@ -155,6 +155,16 @@ jobs:
       - name: Controller joins its own network and receives a static mesh IP
         run: |
           set -Eeuo pipefail
+
+          # Pre-seed per-network config BEFORE joining so ZeroTier accepts
+          # globally-routable IPs (44.x.x.x). Without allowGlobal=1 the daemon
+          # silently refuses to assign non-RFC1918 addresses to the zt* interface.
+          docker exec zt-controller bash -c "
+            mkdir -p /var/lib/zerotier-one/networks.d
+            printf 'allowManaged=1\nallowGlobal=1\nallowDefault=0\nallowDNS=0\n' \
+              > /var/lib/zerotier-one/networks.d/${ZT_NETWORK_ID}.local.conf
+          "
+
           docker exec zt-controller zerotier-cli join "$ZT_NETWORK_ID"
 
           # Poll until the member record appears in the controller, then authorize
