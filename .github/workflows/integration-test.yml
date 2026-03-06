@@ -212,6 +212,7 @@ jobs:
             -e MESH_ADDRESS_RANGE=44.30.127.0/24 \
             -e BGP_HOLD_TIME=30 \
             -e BGP_KEEPALIVE_TIME=10 \
+            -e MAX_WAIT=30 \
             -v "$(pwd)/deploy/bird-border/bird.conf.template:/etc/bird/bird.conf.template:ro" \
             44mesh-bird-border:ci
 
@@ -236,12 +237,38 @@ jobs:
             -v "$(pwd)/deploy/rpi-isp/bird.conf.template:/etc/bird/bird.conf.template:ro" \
             44mesh-bird-isp:ci
 
+      - name: Wait for BIRD containers to be running
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for BIRD containers to start (up to 60s)..."
+          timeout 60 bash -c '
+            until [ "$(docker inspect -f "{{.State.Status}}" bird-border 2>/dev/null)" = "running" ] && \
+                  [ "$(docker inspect -f "{{.State.Status}}" bird-isp 2>/dev/null)" = "running" ]; do
+              echo "  border: $(docker inspect -f "{{.State.Status}}" bird-border 2>/dev/null || echo "not found")"
+              echo "  isp: $(docker inspect -f "{{.State.Status}}" bird-isp 2>/dev/null || echo "not found")"
+              sleep 2
+            done
+          '
+          echo "✓ Both BIRD containers running"
+          
+          # Show recent logs to verify startup progress
+          echo ""
+          echo "=== Recent logs from bird-border ==="
+          docker logs bird-border 2>&1 | tail -15
+          echo ""
+          echo "=== Recent logs from bird-isp ==="
+          docker logs bird-isp 2>&1 | tail -15
+
       - name: Verify BGP listeners bound on expected IPs
         run: |
           set -Eeuo pipefail
-          echo "Waiting for TCP/179 listeners to appear (up to 30s)..."
-          timeout 30 bash -c '
-            until ss -nltp | grep -q ":179"; do sleep 2; done
+          echo "Waiting for TCP/179 listeners to appear (up to 90s)..."
+          timeout 90 bash -c '
+            until ss -nltp | grep -q ":179.*172.30.0.100" && \
+                  ss -nltp | grep -q ":179.*172.30.0.1"; do
+              echo "  Listeners found: $(ss -nltp sport = :179 | grep -c ":179" || echo "0")"
+              sleep 3
+            done
           '
           echo "=== BGP listeners (TCP/179) ==="
           ss -nltp 'sport = :179'
