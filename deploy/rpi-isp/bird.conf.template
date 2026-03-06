@@ -5,6 +5,9 @@ router id ${ISP_IP};
 
 log syslog all;
 
+# Listen only on our specific IP to avoid conflicts with border router
+listen bgp address ${ISP_IP};
+
 protocol device {
     scan time 10;
 }

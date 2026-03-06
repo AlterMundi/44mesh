@@ -251,13 +251,26 @@ jobs:
           '
           echo "✓ Both BIRD containers running"
           
-          # Show recent logs to verify startup progress
           echo ""
-          echo "=== Recent logs from bird-border ==="
-          docker logs bird-border 2>&1 | tail -15
+          echo "=== Container details ==="
+          docker ps -a --filter "name=bird-"
+          
+          # Show full logs to diagnose startup issues
           echo ""
-          echo "=== Recent logs from bird-isp ==="
-          docker logs bird-isp 2>&1 | tail -15
+          echo "=== Full logs from bird-border ==="
+          docker logs bird-border 2>&1
+          echo ""
+          echo "=== Full logs from bird-isp ==="
+          docker logs bird-isp 2>&1
+          
+          # Check if BIRD processes are actually running inside containers
+          echo ""
+          echo "=== BIRD processes check ==="
+          echo "Border router BIRD status:"
+          docker exec bird-border birdc show status 2>&1 || echo "⚠ birdc failed"
+          echo ""
+          echo "ISP BIRD status:"
+          docker exec bird-isp birdc show status 2>&1 || echo "⚠ birdc failed"
 
       - name: Verify BGP listeners bound on expected IPs
         run: |
