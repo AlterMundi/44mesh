@@ -3,7 +3,7 @@
 
 router id ${ISP_IP};
 
-log syslog all;
+log stderr all;
 
 protocol device {
     scan time 10;
@@ -29,6 +29,7 @@ protocol bgp border_router {
     description "Border Router AS ${BORDER_ROUTER_AS}";
     local ${ISP_IP} as ${ISP_AS};
     neighbor ${BORDER_ROUTER_IP} as ${BORDER_ROUTER_AS};
+    multihop;
     strict bind yes;
 
     ipv4 {

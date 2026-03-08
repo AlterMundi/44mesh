@@ -3,7 +3,7 @@
 
 router id ${BORDER_ROUTER_IP};
 
-log syslog all;
+log stderr all;
 
 protocol device {
     scan time 10;
@@ -16,7 +16,6 @@ protocol kernel {
     };
 }
 
-# Direct routes - learn ZeroTier interface
 protocol direct {
     ipv4;
     interface "zt*";
@@ -27,6 +26,7 @@ protocol bgp isp {
     description "ISP AS ${ISP_AS}";
     local ${BORDER_ROUTER_IP} as ${BORDER_ROUTER_AS};
     neighbor ${ISP_IP} as ${ISP_AS};
+    multihop;
     strict bind yes;
 
     ipv4 {
