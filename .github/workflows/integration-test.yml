@@ -452,6 +452,10 @@ jobs:
         run: |
           set -Eeuo pipefail
 
+          echo "Installing ping in ZT containers..."
+          docker exec zt-node1 sh -c "apt-get update -qq && apt-get install -y -qq iputils-ping >/dev/null 2>&1"
+          docker exec zt-node2 sh -c "apt-get update -qq && apt-get install -y -qq iputils-ping >/dev/null 2>&1"
+
           echo "=== Ping: node1 ($NODE1_IP) → node2 ($NODE2_IP) ==="
           docker exec zt-node1 ping -c 5 -W 3 "$NODE2_IP" || {
             echo "✗ FAIL: node1 cannot ping node2"
