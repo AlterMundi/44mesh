@@ -237,60 +237,49 @@ jobs:
             -v "$(pwd)/deploy/rpi-isp/bird.conf.template:/etc/bird/bird.conf.template:ro" \
             44mesh-bird-isp:ci
 
-      - name: Wait for BIRD containers to be running
+      - name: Wait for BIRD containers and BGP listeners
         run: |
           set -Eeuo pipefail
-          echo "Waiting for BIRD containers to start (up to 60s)..."
-          timeout 60 bash -c '
-            until [ "$(docker inspect -f "{{.State.Status}}" bird-border 2>/dev/null)" = "running" ] && \
-                  [ "$(docker inspect -f "{{.State.Status}}" bird-isp 2>/dev/null)" = "running" ]; do
-              echo "  border: $(docker inspect -f "{{.State.Status}}" bird-border 2>/dev/null || echo "not found")"
-              echo "  isp: $(docker inspect -f "{{.State.Status}}" bird-isp 2>/dev/null || echo "not found")"
-              sleep 2
-            done
-          '
-          echo "✓ Both BIRD containers running"
-          
-          echo ""
-          echo "=== Container details ==="
-          docker ps -a --filter "name=bird-"
-          
-          # Show full logs to diagnose startup issues
-          echo ""
-          echo "=== Full logs from bird-border ==="
-          docker logs bird-border 2>&1
-          echo ""
-          echo "=== Full logs from bird-isp ==="
-          docker logs bird-isp 2>&1
-          
-          # Check if BIRD processes are actually running inside containers
-          echo ""
-          echo "=== BIRD processes check ==="
-          echo "Border router BIRD status:"
-          docker exec bird-border birdc show status 2>&1 || echo "⚠ birdc failed"
-          echo ""
-          echo "ISP BIRD status:"
-          docker exec bird-isp birdc show status 2>&1 || echo "⚠ birdc failed"
 
-      - name: Verify BGP listeners bound on expected IPs
-        run: |
-          set -Eeuo pipefail
-          echo "Waiting for TCP/179 listeners to appear (up to 90s)..."
-          timeout 90 bash -c '
-            until ss -nltp | grep -q ":179.*172.30.0.100" && \
-                  ss -nltp | grep -q ":179.*172.30.0.1"; do
-              echo "  Listeners found: $(ss -nltp sport = :179 | grep -c ":179" || echo "0")"
-              sleep 3
-            done
-          '
-          echo "=== BGP listeners (TCP/179) ==="
-          ss -nltp 'sport = :179'
-          # Both border (172.30.0.100) and ISP (172.30.0.1) must be listening
-          ss -nltp 'sport = :179' | grep -q "172.30.0.100" || \
-            { echo "✗ FAIL: border router not listening on 172.30.0.100:179"; exit 1; }
-          ss -nltp 'sport = :179' | grep -q "172.30.0.1" || \
-            { echo "✗ FAIL: mock ISP not listening on 172.30.0.1:179"; exit 1; }
-          echo "✓ BGP listeners verified"
+          echo "Waiting for BIRD containers to start and BGP to listen (up to 90s)..."
+          elapsed=0
+          while [ $elapsed -lt 90 ]; do
+            border="$(docker inspect -f '{{.State.Status}}' bird-border 2>/dev/null || echo missing)"
+            isp="$(docker inspect -f '{{.State.Status}}' bird-isp 2>/dev/null || echo missing)"
+
+            # Fail fast if either container has already crashed
+            if [ "$border" = "exited" ] || [ "$isp" = "exited" ]; then
+              echo "✗ Container crashed — border=$border isp=$isp"
+              echo ""
+              echo "=== bird-border logs ==="
+              docker logs bird-border 2>&1 || true
+              echo ""
+              echo "=== bird-isp logs ==="
+              docker logs bird-isp 2>&1 || true
+              exit 1
+            fi
+
+            # Check if both TCP/179 listeners are up
+            if ss -nltp 'sport = :179' | grep -q "172.30.0.100" && \
+               ss -nltp 'sport = :179' | grep -q "172.30.0.1"; then
+              echo "✓ Both BGP listeners are up"
+              ss -nltp 'sport = :179'
+              exit 0
+            fi
+
+            echo "  ${elapsed}s — border=$border isp=$isp listeners=$(ss -nltp 'sport = :179' | grep -c ':179' || echo 0)"
+            sleep 3
+            elapsed=$((elapsed + 3))
+          done
+
+          echo "✗ Timeout waiting for BGP listeners after ${elapsed}s"
+          docker ps -a --filter "name=bird-"
+          echo "=== bird-border logs ==="
+          docker logs bird-border 2>&1 || true
+          echo "=== bird-isp logs ==="
+          docker logs bird-isp 2>&1 || true
+          ss -nltp 'sport = :179' || true
+          exit 1
 
       # ── TEST 1: BGP ──────────────────────────────────────────────────────────
 

@@ -5,9 +5,6 @@ router id ${BORDER_ROUTER_IP};
 
 log syslog all;
 
-# Listen only on our specific IP to avoid conflicts with ISP container
-listen bgp address ${BORDER_ROUTER_IP};
-
 protocol device {
     scan time 10;
 }
@@ -30,6 +27,7 @@ protocol bgp isp {
     description "ISP AS ${ISP_AS}";
     local ${BORDER_ROUTER_IP} as ${BORDER_ROUTER_AS};
     neighbor ${ISP_IP} as ${ISP_AS};
+    strict bind yes;
 
     ipv4 {
         # Accept all routes from peer (works for both iBGP and eBGP)
