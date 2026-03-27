@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # 44Mesh
 
 Run your own Autonomous System (AS) with BGP peering and a ZeroTier mesh network.

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # 44mesh ZeroTier UI (ztncui fork)
 
 Web UI for managing a ZeroTier controller. Customized [ztncui](https://github.com/key-networks/ztncui)

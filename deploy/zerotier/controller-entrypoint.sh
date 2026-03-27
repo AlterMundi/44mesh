@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: 2025 AlterMundi
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
 set -e
 
 ZT_DIR=/var/lib/zerotier-one

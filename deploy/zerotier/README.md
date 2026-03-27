@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # ZeroTier Mesh Node (Docker)
 
 Joins the any89 mesh network using the [AlterMundi/ZeroTierOne](https://github.com/AlterMundi/ZeroTierOne)

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Border Router Setup
 
 > [← Back to main README](../../README.md)

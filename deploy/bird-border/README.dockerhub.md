@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # 44mesh BIRD2 Border Router
 
 BIRD2 border router container for 44mesh networks. Handles eBGP peering with upstream ISPs

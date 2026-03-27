@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # 44mesh BIRD2 Router for Raspberry Pi
 
 BIRD2-based BGP router image for 44mesh ISP nodes. Tuned for Raspberry Pi and general ARM/AMD64.

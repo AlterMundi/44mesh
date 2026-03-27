@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # ZeroTier Mesh — Architecture & Operations Guide
 
 This document describes the ZeroTier-based mesh used in 44mesh, including the
