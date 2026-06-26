@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 AlterMundi
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
 # BIRD - Mock ISP (AS ${ISP_AS})
 # Announces test prefixes to Border Router
 

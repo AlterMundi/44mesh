@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 AlterMundi
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # 44mesh ZeroTier (AlterMundi fork)
 
 Multi-arch ZeroTier One built from the [AlterMundi fork](https://github.com/AlterMundi/ZeroTierOne)

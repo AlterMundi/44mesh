@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 AlterMundi
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
 # Mock ISP - Raspberry Pi
 # AS 65001 - Announces test prefixes to Border Router
 

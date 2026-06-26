@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2025 AlterMundi
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
 set -eu
 
 ZT_TOKEN_FILE="/var/lib/zerotier-one/authtoken.secret"
