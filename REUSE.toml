@@ -8,3 +8,9 @@ path = "deploy/zerotier-ui/network-config-example.json"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025 AlterMundi"
 SPDX-License-Identifier = "GPL-3.0-only"
+
+[[annotations]]
+path = "deploy/zerotier/local.conf"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 AlterMundi"
+SPDX-License-Identifier = "GPL-3.0-only"
