@@ -5,7 +5,7 @@
 services:
   zerotier:
     build: .
-    # image: zerotier/zerotier:1.14.2
+    image: buzondefede/44mesh-zerotier:latest
     container_name: zerotier
     network_mode: host
     cap_add:
